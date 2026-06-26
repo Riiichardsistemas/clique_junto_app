@@ -76,3 +76,4 @@ App em `http://localhost:5173`. Crie uma conta em `/register` e acesse o painel.
 > Observação: Google OAuth foi previsto no model (`provider`, `googleId`) mas a
 > autenticação inicial usa email + senha (JWT), conforme a stack Express do projeto.
 # era_uma_vez_app
+# era_uma_vez_app
