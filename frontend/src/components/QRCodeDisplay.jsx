@@ -56,7 +56,7 @@ export default function QRCodeDisplay({ event }) {
       </div>
 
       {/* Link */}
-      <p className="max-w-xs break-all text-center text-xs text-white/40">{guestUrl}</p>
+      <p className="max-w-xs break-all text-center text-xs text-cream/40">{guestUrl}</p>
 
       {/* Ações */}
       <div className="flex flex-wrap justify-center gap-2">

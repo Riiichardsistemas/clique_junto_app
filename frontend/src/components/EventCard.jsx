@@ -18,12 +18,11 @@ export default function EventCard({ event }) {
   return (
     <Link
       to={`/events/${event.id}`}
-      className="group block rounded-2xl border border-white/8 bg-white/3 p-5 transition-all duration-200 hover:border-white/18 hover:bg-white/6"
-      style={{ background: 'rgba(255,255,255,0.03)' }}
+      className="group block rounded-2xl border border-cream/[0.08] bg-cream/[0.03] p-5 transition-all duration-200 hover:border-gold/30 hover:bg-cream/[0.06]"
     >
       {/* Status + tipo */}
       <div className="mb-3 flex items-center justify-between gap-2">
-        <span className="text-[11px] uppercase tracking-widest text-white/30">
+        <span className="label-mono text-cream/35">
           {TYPE_LABEL[event.type] || event.type}
         </span>
         <span className={s.cls}>{s.label}</span>
@@ -35,20 +34,20 @@ export default function EventCard({ event }) {
       </p>
 
       {/* Métricas */}
-      <div className="mt-4 flex gap-5 text-sm text-white/35">
+      <div className="mt-4 flex gap-5 text-sm text-cream/35">
         <span>
-          <span className="font-semibold text-white/70">{event.guestCount ?? 0}</span>{' '}
+          <span className="font-semibold text-cream/70">{event.guestCount ?? 0}</span>{' '}
           convidados
         </span>
         <span>
-          <span className="font-semibold text-white/70">{event.photoCount ?? 0}</span>{' '}
+          <span className="font-semibold text-cream/70">{event.photoCount ?? 0}</span>{' '}
           fotos
         </span>
       </div>
 
       {/* Data */}
       {event.endsAt && (
-        <p className="mt-3 text-[11px] text-white/25">
+        <p className="mt-3 text-[11px] text-cream/25">
           Encerra {new Date(event.endsAt).toLocaleString('pt-BR', {
             day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
           })}

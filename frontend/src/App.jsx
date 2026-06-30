@@ -18,11 +18,13 @@ export default function App() {
         position="top-center"
         toastOptions={{
           style: {
-            background: '#1a1a1a',
+            background: '#1c1814',
             color: '#f0ebe3',
-            border: '1px solid rgba(255,255,255,0.08)',
+            border: '1px solid rgba(240,235,227,0.1)',
             fontSize: '14px',
+            borderRadius: '14px',
           },
+          success: { iconTheme: { primary: '#c9a86a', secondary: '#1c1814' } },
         }}
       />
       <Routes>

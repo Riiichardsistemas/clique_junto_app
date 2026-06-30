@@ -37,7 +37,7 @@ export default function FilterSelector({ value, onChange }) {
             )}
           </div>
           <span
-            className={`text-xs font-medium ${f.id === value ? 'text-gold' : 'text-white/60'}`}
+            className={`text-xs font-medium ${f.id === value ? 'text-gold' : 'text-cream/60'}`}
           >
             {f.label}
           </span>

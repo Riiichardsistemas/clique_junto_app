@@ -2,19 +2,55 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { guestApi } from '../../api/guestApi';
 
+const TYPE_LABEL = {
+  casamento: 'Casamento', festa: 'Festa', aniversario: 'Aniversário',
+  corporativo: 'Corporativo', viagem: 'Viagem', outro: 'Evento',
+};
+
 function Loader() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-black">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-white/60" />
+    <div className="flex min-h-screen items-center justify-center bg-ink-deep">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-cream/15 border-t-cream/60" />
     </div>
   );
 }
 
 function NotFound() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-black text-cream px-6 text-center">
-      <p className="font-serif text-3xl mb-3">Evento não encontrado</p>
-      <p className="text-sm text-white/40">O link pode estar errado ou o evento foi removido.</p>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-ink-deep px-6 text-center text-cream">
+      <p className="mb-3 font-serif text-3xl">Evento não encontrado</p>
+      <p className="text-sm text-cream/40">O link pode estar errado ou o evento foi removido.</p>
+    </div>
+  );
+}
+
+function Countdown({ target }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const diff = target ? Math.max(0, new Date(target).getTime() - now) : null;
+  if (diff === null || diff <= 0) return null;
+  const hrs = Math.floor(diff / 3600000);
+  const min = Math.floor((diff % 3600000) / 60000);
+  const sec = Math.floor((diff % 60000) / 1000);
+  const Box = ({ v, l }) => (
+    <div className="flex flex-col items-center">
+      <span className="font-mono text-2xl font-semibold text-cream">{String(v).padStart(2, '0')}</span>
+      <span className="label-mono mt-1 text-cream/35">{l}</span>
+    </div>
+  );
+  return (
+    <div>
+      <p className="label-mono mb-3 text-center text-cream/35">Encerra em</p>
+      <div className="flex items-start justify-center gap-3">
+        <Box v={hrs} l="hrs" />
+        <span className="font-mono text-2xl text-cream/25">:</span>
+        <Box v={min} l="min" />
+        <span className="font-mono text-2xl text-cream/25">:</span>
+        <Box v={sec} l="seg" />
+      </div>
     </div>
   );
 }
@@ -23,25 +59,22 @@ export default function GuestEntry() {
   const { slug } = useParams();
   const navigate = useNavigate();
 
-  const [event,    setEvent]    = useState(null);
-  const [loading,  setLoading]  = useState(true);
+  const [event, setEvent] = useState(null);
+  const [stats, setStats] = useState({ guestCount: 0, photoCount: 0 });
+  const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [nickname, setNickname] = useState('');
-  const [joining,  setJoining]  = useState(false);
-  const [error,    setError]    = useState('');
+  const [joining, setJoining] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    // Check if already joined
-    const existing = guestApi.getGuestToken(slug);
-    if (existing) {
+    if (guestApi.getGuestToken(slug)) {
       navigate(`/e/${slug}/camera`, { replace: true });
       return;
     }
     guestApi.getEvent(slug)
-      .then((d) => setEvent(d.event))
-      .catch((e) => {
-        if (e?.response?.status === 404) setNotFound(true);
-      })
+      .then((d) => { setEvent(d.event); if (d.stats) setStats(d.stats); })
+      .catch((e) => { if (e?.response?.status === 404) setNotFound(true); })
       .finally(() => setLoading(false));
   }, [slug, navigate]);
 
@@ -56,107 +89,86 @@ export default function GuestEntry() {
       guestApi.setGuestToken(slug, data.token);
       navigate(`/e/${slug}/camera`);
     } catch (err) {
-      const msg = err?.response?.data?.error || 'Erro ao entrar. Tente novamente.';
-      setError(msg);
+      setError(err?.response?.data?.error || 'Erro ao entrar. Tente novamente.');
     } finally {
       setJoining(false);
     }
   }
 
-  if (loading)  return <Loader />;
+  if (loading) return <Loader />;
   if (notFound) return <NotFound />;
 
   const isClosed = event?.status === 'closed' || event?.status === 'revealed';
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center bg-black px-6 overflow-hidden">
-      {/* Film-grain background */}
-      <div className="pointer-events-none absolute inset-0 opacity-30"
-        style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\' opacity=\'0.4\'/%3E%3C/svg%3E")',
-          backgroundSize: '200px' }} />
-
-      {/* Vignette */}
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-ink-deep px-6">
+      <div className="film-grain pointer-events-none absolute inset-0 opacity-25" />
       <div className="pointer-events-none absolute inset-0"
-        style={{ background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.85) 100%)' }} />
+        style={{ background: 'radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.9) 100%)' }} />
 
       <div className="relative z-10 w-full max-w-sm animate-slideup">
-        {/* Logo */}
-        <div className="mb-10 text-center">
-          <Link to="/" className="font-serif text-2xl tracking-wide text-cream">
+        <div className="mb-8 text-center">
+          <Link to="/" className="font-serif text-xl tracking-wide text-cream">
             Era <span className="text-gold">Uma Vez</span>
           </Link>
         </div>
 
-        {/* Card */}
-        <div className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-sm">
-          {/* Event info */}
-          <div className="mb-8 text-center">
-            <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/40">
-              <span className="h-1.5 w-1.5 rounded-full bg-gold animate-pulse-slow" />
-              {event?.type === 'casamento' ? 'Casamento' :
-               event?.type === 'aniversario' ? 'Aniversário' :
-               event?.type === 'corporativo' ? 'Corporativo' : 'Evento'}
-            </div>
-            <h1 className="font-serif text-3xl leading-tight text-cream">{event?.name}</h1>
-            {event?.description && (
-              <p className="mt-2 text-sm text-white/40">{event.description}</p>
-            )}
+        <div className="card p-8">
+          <div className="mb-7 text-center">
+            <p className="label-mono mb-3 text-gold/80">{TYPE_LABEL[event?.type] || 'Evento'}</p>
+            <h1 className="font-serif text-4xl leading-tight text-cream">{event?.name}</h1>
+            <p className="mt-3 text-sm text-cream/40">
+              <span className="text-cream/70">{stats.guestCount}</span> participantes
+              <span className="mx-2 text-cream/20">·</span>
+              <span className="text-cream/70">{stats.photoCount}</span> fotos
+            </p>
           </div>
+
+          {!isClosed && event?.endsAt && (
+            <div className="mb-7 border-y border-cream/[0.06] py-6">
+              <Countdown target={event.endsAt} />
+            </div>
+          )}
 
           {isClosed ? (
             <div className="text-center">
-              <p className="text-sm text-white/40 mb-2">Este evento está encerrado.</p>
-              <Link to={`/e/${slug}/album`} className="btn-film w-full mt-4 block text-center py-3 rounded-2xl text-sm font-semibold">
+              <p className="mb-4 text-sm text-cream/40">Este evento está encerrado.</p>
+              <Link to={`/e/${slug}/album`} className="btn-film block w-full rounded-2xl py-3.5 text-sm">
                 Ver álbum
               </Link>
             </div>
           ) : (
             <form onSubmit={handleJoin} className="space-y-4">
               <div>
-                <label className="mb-1.5 block text-xs uppercase tracking-widest text-white/40">
-                  Seu nome
-                </label>
-                <input
-                  type="text"
-                  value={nickname}
-                  onChange={(e) => setNickname(e.target.value)}
-                  placeholder="Como quer ser chamado?"
-                  className="input-field"
-                  maxLength={40}
-                  autoFocus
-                />
+                <label className="label-mono mb-2 block text-cream/45">Seu nome</label>
+                <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)}
+                  placeholder="Como quer ser chamado?" className="input-field" maxLength={40} autoFocus />
               </div>
 
-              {error && (
-                <p className="rounded-xl bg-red-500/10 px-4 py-2 text-sm text-red-400">{error}</p>
-              )}
+              {error && <p className="rounded-xl bg-red-500/10 px-4 py-2 text-sm text-red-300">{error}</p>}
 
-              <button
-                type="submit"
-                disabled={joining}
-                className="btn-film w-full rounded-2xl py-3.5 text-sm font-semibold disabled:opacity-50"
-              >
+              <button type="submit" disabled={joining}
+                className="btn-primary w-full rounded-2xl py-3.5 disabled:opacity-50">
                 {joining ? (
                   <span className="inline-flex items-center gap-2">
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/20 border-t-black" />
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-ink/30 border-t-ink" />
                     Entrando…
                   </span>
-                ) : (
-                  '📷  Entrar no evento'
-                )}
+                ) : 'Entrar e fotografar'}
               </button>
 
-              <p className="text-center text-xs text-white/25">
-                Sem cadastro. Sem download.
-              </p>
+              <p className="text-center text-xs text-cream/30">Sem cadastro · Sem download · No navegador</p>
+              <Link to={`/e/${slug}/album`} className="block text-center text-sm text-cream/45 transition hover:text-gold">
+                Ver álbum →
+              </Link>
             </form>
           )}
         </div>
 
-        {/* Film strip decoration */}
+        {/* Tira de filme decorativa */}
         <div className="mt-8 flex items-center justify-center gap-1 opacity-20">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-5 w-4 rounded-[2px] border border-white/30 bg-white/5" />
+          {Array.from({ length: 9 }).map((_, i) => (
+            <div key={i} className="h-5 w-4 rounded-[2px] border border-cream/30 bg-cream/5" />
           ))}
         </div>
       </div>

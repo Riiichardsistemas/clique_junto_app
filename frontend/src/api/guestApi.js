@@ -19,6 +19,10 @@ function guestHeaders(slug) {
 }
 
 export const guestApi = {
+  // Helpers de token expostos no objeto (usados pelas páginas do convidado)
+  getGuestToken,
+  setGuestToken,
+
   getEvent: (slug) =>
     axios.get(`${BASE}/guests/event/${slug}`).then((r) => r.data),
 

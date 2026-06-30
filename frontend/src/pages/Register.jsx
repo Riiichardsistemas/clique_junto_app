@@ -72,7 +72,7 @@ export default function Register() {
           Criar conta grátis
         </Button>
       </form>
-      <p className="mt-6 text-center text-sm text-white/60">
+      <p className="mt-6 text-center text-sm text-cream/55">
         Já tem conta?{' '}
         <Link to="/login" className="text-gold hover:underline">
           Entrar

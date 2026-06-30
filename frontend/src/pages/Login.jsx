@@ -59,7 +59,7 @@ export default function Login() {
           Entrar
         </Button>
       </form>
-      <p className="mt-6 text-center text-sm text-white/60">
+      <p className="mt-6 text-center text-sm text-cream/55">
         Não tem conta?{' '}
         <Link to="/register" className="text-gold hover:underline">
           Criar agora
@@ -71,14 +71,15 @@ export default function Login() {
 
 export function AuthShell({ title, subtitle, children }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-ink px-6 py-12">
-      <div className="w-full max-w-md">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-6 py-12">
+      <div className="film-grain pointer-events-none absolute inset-0 opacity-[0.12]" />
+      <div className="relative z-10 w-full max-w-md animate-slideup">
         <Link to="/" className="mb-8 block text-center font-serif text-xl">
-          ERA <span className="text-gold">UMA VEZ</span>
+          Era <span className="text-gold">Uma Vez</span>
         </Link>
-        <div className="rounded-2xl border border-white/10 bg-surface p-8">
+        <div className="card p-8">
           <h1 className="font-serif text-3xl">{title}</h1>
-          {subtitle && <p className="mb-6 mt-1 text-sm text-white/60">{subtitle}</p>}
+          {subtitle && <p className="mb-6 mt-1.5 text-sm text-cream/50">{subtitle}</p>}
           {children}
         </div>
       </div>

@@ -7,9 +7,13 @@ export const eventApi = {
   update: (id, data) => api.put(`/events/${id}`, data).then((r) => r.data),
   close: (id) => api.post(`/events/${id}/close`).then((r) => r.data),
   reveal: (id) => api.post(`/events/${id}/reveal`).then((r) => r.data),
+  publish: (id) => api.post(`/events/${id}/publish`).then((r) => r.data),
   listGuests: (id) => api.get(`/events/${id}/guests`).then((r) => r.data),
-  banGuest: (id, guestId, banned) =>
+  banGuest: (id, guestId, banned = true) =>
     api.post(`/events/${id}/guests/${guestId}/ban`, { banned }).then((r) => r.data),
+  // ZIP de todas as fotos (organizador) — modo local
+  downloadZip: (id) =>
+    api.get(`/photos/event/${id}/download`, { responseType: 'blob' }).then((r) => r.data),
   qrCodeUrl: (id) => {
     const base = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
     return `${base}/events/${id}/qrcode`;
