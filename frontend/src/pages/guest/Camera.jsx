@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { guestApi } from '../../api/guestApi';
-import { photoApi } from '../../api/photoApi';
 import { FILTER_DEFS, applyFilterToBlob } from '../../utils/filters';
+import { enqueueUpload, subscribeQueue, processQueue } from '../../utils/uploadQueue';
+
+const MAX_VIDEO_SECONDS = 15;
 
 // Filtros disponíveis no visor (ids válidos no backend) com rótulos de filme
 const CAMERA_FILTERS = [
@@ -45,11 +47,16 @@ async function compressImage(file, maxDim = 1600, quality = 0.82) {
   });
 }
 
-function PreviewScreen({ previewUrl, onRetake, onUpload, uploading, filter }) {
+function PreviewScreen({ previewUrl, onRetake, onUpload, uploading, filter, isVideo }) {
   return (
     <div className="flex min-h-screen flex-col bg-ink-deep">
       <div className="relative flex-1 overflow-hidden">
-        <img src={previewUrl} alt="Pré-visualização" className="h-full w-full object-cover" style={{ filter: filter?.css }} />
+        {isVideo ? (
+          <video src={previewUrl} autoPlay loop playsInline controls={false}
+            className="h-full w-full object-cover" style={{ filter: filter?.css }} />
+        ) : (
+          <img src={previewUrl} alt="Pré-visualização" className="h-full w-full object-cover" style={{ filter: filter?.css }} />
+        )}
         <div className="pointer-events-none absolute inset-4">
           <span className="absolute left-0 top-0 h-8 w-8 border-l-2 border-t-2 border-cream/60" />
           <span className="absolute right-0 top-0 h-8 w-8 border-r-2 border-t-2 border-cream/60" />
@@ -66,9 +73,9 @@ function PreviewScreen({ previewUrl, onRetake, onUpload, uploading, filter }) {
           {uploading ? (
             <span className="inline-flex items-center gap-2">
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-ink/20 border-t-ink" />
-              Enviando…
+              Guardando…
             </span>
-          ) : 'Usar foto'}
+          ) : (isVideo ? 'Usar vídeo' : 'Usar foto')}
         </button>
       </div>
     </div>
@@ -89,14 +96,25 @@ export default function Camera() {
   const [facingMode, setFacingMode] = useState('environment');
   const [previewUrl, setPreviewUrl] = useState(null);
   const [capturedBlob, setCapturedBlob] = useState(null);
+  const [capturedMeta, setCapturedMeta] = useState(null); // { mediaType, durationSeconds, fileType }
   const [uploading, setUploading] = useState(false);
   const [photoCount, setPhotoCount] = useState(0);
   const [flashActive, setFlashActive] = useState(false);
   const [toast, setToast] = useState(null);
   const [clock, setClock] = useState('');
 
+  // Modo foto/vídeo + gravação
+  const [mode, setMode] = useState('photo'); // 'photo' | 'video'
+  const [recording, setRecording] = useState(false);
+  const [recordSecs, setRecordSecs] = useState(0);
+
+  // Fila de upload em background
+  const [queue, setQueue] = useState({ pending: 0, sending: false });
+
   const videoRef = useRef(null);
   const fileRef = useRef(null);
+  const recorderRef = useRef(null);
+  const recordTimerRef = useRef(null);
 
   function showToast(msg, type = 'success') {
     setToast({ msg, type });
@@ -125,17 +143,27 @@ export default function Camera() {
       .finally(() => setLoading(false));
   }, [slug, navigate]);
 
-  const startCamera = useCallback(async (facing = facingMode) => {
+  const startCamera = useCallback(async (facing = facingMode, withAudio = mode === 'video') => {
     try {
       if (stream) stream.getTracks().forEach((t) => t.stop());
       const s = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } },
-        audio: false,
+        audio: withAudio,
       });
       setStream(s);
       if (videoRef.current) videoRef.current.srcObject = s;
     } catch { /* sem permissão de câmera — pode usar upload */ }
-  }, [stream, facingMode]);
+  }, [stream, facingMode, mode]);
+
+  // Status da fila de upload (offline/retry)
+  useEffect(() => {
+    const unsub = subscribeQueue((state) => {
+      setQueue(state);
+      if (state.rejected) showToast(state.error || 'Um envio foi recusado.', 'error');
+    });
+    processQueue(); // retoma envios pendentes de sessões anteriores
+    return unsub;
+  }, []);
 
   useEffect(() => {
     if (!loading && !authError) startCamera();
@@ -163,16 +191,75 @@ export default function Camera() {
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     canvas.toBlob((blob) => {
       setCapturedBlob(blob);
+      setCapturedMeta({ mediaType: 'photo', fileType: 'image/jpeg' });
       setPreviewUrl(URL.createObjectURL(blob));
     }, 'image/jpeg', 0.9);
     setFlashActive(true);
     setTimeout(() => setFlashActive(false), 180);
   }
 
+  // ---- Vídeo curto (máx. 15s) ----
+
+  function pickRecorderMime() {
+    const candidates = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+    return candidates.find((m) => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || '';
+  }
+
+  async function startRecording() {
+    let s = stream;
+    // Garante trilha de áudio para o vídeo
+    if (!s || s.getAudioTracks().length === 0) {
+      try {
+        s = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: true,
+        });
+        if (stream) stream.getTracks().forEach((t) => t.stop());
+        setStream(s);
+        if (videoRef.current) videoRef.current.srcObject = s;
+      } catch { showToast('Não foi possível acessar o microfone.', 'error'); return; }
+    }
+
+    const mime = pickRecorderMime();
+    const chunks = [];
+    const rec = new MediaRecorder(s, mime ? { mimeType: mime } : undefined);
+    const startedAt = Date.now();
+    rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    rec.onstop = () => {
+      clearInterval(recordTimerRef.current);
+      setRecording(false);
+      setRecordSecs(0);
+      const type = (mime || 'video/webm').split(';')[0];
+      const blob = new Blob(chunks, { type });
+      const duration = Math.min(MAX_VIDEO_SECONDS, (Date.now() - startedAt) / 1000);
+      if (duration < 1) { showToast('Vídeo muito curto.', 'error'); return; }
+      setCapturedBlob(blob);
+      setCapturedMeta({ mediaType: 'video', durationSeconds: Math.round(duration * 10) / 10, fileType: type });
+      setPreviewUrl(URL.createObjectURL(blob));
+    };
+    recorderRef.current = rec;
+    rec.start();
+    setRecording(true);
+    setRecordSecs(0);
+    recordTimerRef.current = setInterval(() => {
+      setRecordSecs((sec) => {
+        if (sec + 1 >= MAX_VIDEO_SECONDS) stopRecording();
+        return sec + 1;
+      });
+    }, 1000);
+  }
+
+  function stopRecording() {
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      recorderRef.current.stop();
+    }
+  }
+
   function handleRetake() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     setCapturedBlob(null);
+    setCapturedMeta(null);
   }
 
   async function handleFileSelect(e) {
@@ -180,30 +267,37 @@ export default function Camera() {
     if (!file) return;
     const compressed = await compressImage(file);
     setCapturedBlob(compressed);
+    setCapturedMeta({ mediaType: 'photo', fileType: 'image/jpeg' });
     setPreviewUrl(URL.createObjectURL(compressed));
     e.target.value = '';
   }
 
+  // Entrega para a fila offline: salva no dispositivo e envia em background
   async function handleUpload() {
-    if (!capturedBlob) return;
+    if (!capturedBlob || !capturedMeta) return;
     setUploading(true);
     try {
-      const filtered = await applyFilterToBlob(capturedBlob, activeFilter.id);
-      const file = new File([filtered], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      const isVideo = capturedMeta.mediaType === 'video';
+      let blob = capturedBlob;
+      if (!isVideo) blob = await applyFilterToBlob(capturedBlob, activeFilter.id);
 
-      const { uploadUrl, key, storageMode } = await photoApi.getUploadUrl(slug, file.name, file.type);
-      if (storageMode === 's3') {
-        await photoApi.s3Upload(uploadUrl, file);
-      } else {
-        await photoApi.localUpload(key, file);
-      }
-      await photoApi.savePhoto(slug, key, activeFilter.id);
+      const ext = isVideo ? (capturedMeta.fileType === 'video/mp4' ? '.mp4' : '.webm') : '.jpg';
+      await enqueueUpload({
+        slug,
+        blob,
+        fileName: `${isVideo ? 'video' : 'photo'}-${Date.now()}${ext}`,
+        fileType: isVideo ? capturedMeta.fileType : 'image/jpeg',
+        mediaType: capturedMeta.mediaType,
+        filter: activeFilter.id,
+        durationSeconds: capturedMeta.durationSeconds || null,
+      });
 
       setPhotoCount((c) => c + 1);
       handleRetake();
-      showToast('Foto guardada 🎞️');
+      showToast(navigator.onLine ? (isVideo ? 'Vídeo guardado 🎬' : 'Foto guardada 🎞️')
+        : 'Guardado! Envia quando a conexão voltar 📡');
     } catch {
-      showToast('Erro ao enviar foto.', 'error');
+      showToast('Erro ao guardar. Tente novamente.', 'error');
     } finally {
       setUploading(false);
     }
@@ -236,7 +330,24 @@ export default function Camera() {
   if (previewUrl) {
     return (
       <PreviewScreen previewUrl={previewUrl} filter={activeFilter} uploading={uploading}
+        isVideo={capturedMeta?.mediaType === 'video'}
         onRetake={handleRetake} onUpload={handleUpload} />
+    );
+  }
+
+  // Filme completo: convite claro para o álbum (em vez de botão apagado)
+  if (!unlimited && remaining <= 0) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-ink-deep px-6 text-center text-cream">
+        <p className="font-serif text-3xl">Filme completo! 🎞️</p>
+        <p className="max-w-xs text-sm text-cream/45">
+          Você usou seus {maxPhotos} frames. Suas memórias estão guardadas para a revelação.
+        </p>
+        {queue.pending > 0 && (
+          <p className="label-mono text-gold/80">{queue.pending} na fila de envio…</p>
+        )}
+        <Link to={`/e/${slug}/album`} className="btn-film rounded-2xl px-8 py-3 text-sm">Ver álbum</Link>
+      </div>
     );
   }
 
@@ -254,9 +365,23 @@ export default function Camera() {
       {/* Top bar */}
       <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between px-5 pt-4">
         <span className="film-counter text-cream/70">{clock}</span>
-        <Link to={`/e/${slug}/album`} className="flex h-9 w-9 items-center justify-center rounded-full border border-cream/15 bg-ink/40 text-cream/70 backdrop-blur-sm transition hover:text-cream">
-          ✕
-        </Link>
+        <div className="flex items-center gap-2">
+          {queue.pending > 0 && (
+            <span className="flex items-center gap-1.5 rounded-full border border-gold/30 bg-ink/50 px-3 py-1 text-[11px] text-gold/90 backdrop-blur-sm">
+              {queue.sending && <span className="h-2.5 w-2.5 animate-spin rounded-full border border-gold/30 border-t-gold" />}
+              {queue.sending ? `Enviando ${queue.pending}…` : `${queue.pending} na fila`}
+            </span>
+          )}
+          {recording && (
+            <span className="flex items-center gap-1.5 rounded-full bg-red-500/90 px-3 py-1 text-[11px] font-semibold text-white">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
+              {String(recordSecs).padStart(2, '0')}s / {MAX_VIDEO_SECONDS}s
+            </span>
+          )}
+          <Link to={`/e/${slug}/album`} className="flex h-9 w-9 items-center justify-center rounded-full border border-cream/15 bg-ink/40 text-cream/70 backdrop-blur-sm transition hover:text-cream">
+            ✕
+          </Link>
+        </div>
       </div>
 
       {/* Viewfinder */}
@@ -307,23 +432,46 @@ export default function Camera() {
         </div>
       </div>
 
+      {/* Seletor foto/vídeo */}
+      <div className="flex justify-center border-t border-cream/[0.06] bg-ink-deep pt-3">
+        <div className="flex gap-1 rounded-full border border-cream/10 bg-cream/[0.04] p-1">
+          {[{ id: 'photo', label: 'Foto' }, { id: 'video', label: `Vídeo ${MAX_VIDEO_SECONDS}s` }].map((m) => (
+            <button key={m.id} onClick={() => !recording && setMode(m.id)}
+              className={`rounded-full px-4 py-1 text-xs font-medium transition ${
+                mode === m.id ? 'bg-gold text-ink' : 'text-cream/50 hover:text-cream/80'}`}>
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Controles */}
-      <div className="flex items-center justify-between border-t border-cream/[0.06] bg-ink-deep px-10 py-6">
-        <button onClick={() => fileRef.current?.click()}
-          className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cream/15 bg-cream/[0.04] text-cream/60 transition hover:text-cream">
+      <div className="flex items-center justify-between bg-ink-deep px-10 py-5">
+        <button onClick={() => fileRef.current?.click()} disabled={recording}
+          className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cream/15 bg-cream/[0.04] text-cream/60 transition hover:text-cream disabled:opacity-30">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
           </svg>
         </button>
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
 
-        <button onClick={capturePhoto} disabled={remaining <= 0}
-          className="relative flex h-20 w-20 items-center justify-center rounded-full border-4 border-cream/30 transition active:scale-95 disabled:opacity-30">
-          <span className="h-14 w-14 rounded-full bg-cream" />
-        </button>
+        {mode === 'photo' ? (
+          <button onClick={capturePhoto} disabled={remaining <= 0}
+            className="relative flex h-20 w-20 items-center justify-center rounded-full border-4 border-cream/30 transition active:scale-95 disabled:opacity-30">
+            <span className="h-14 w-14 rounded-full bg-cream" />
+          </button>
+        ) : (
+          <button onClick={recording ? stopRecording : startRecording} disabled={remaining <= 0}
+            className={`relative flex h-20 w-20 items-center justify-center rounded-full border-4 transition active:scale-95 disabled:opacity-30 ${
+              recording ? 'border-red-400/70' : 'border-cream/30'}`}>
+            <span className={`transition-all ${recording
+              ? 'h-8 w-8 rounded-lg bg-red-500'
+              : 'h-14 w-14 rounded-full bg-red-500'}`} />
+          </button>
+        )}
 
-        <button onClick={flipCamera}
-          className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cream/15 bg-cream/[0.04] text-cream/60 transition hover:text-cream">
+        <button onClick={flipCamera} disabled={recording}
+          className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cream/15 bg-cream/[0.04] text-cream/60 transition hover:text-cream disabled:opacity-30">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="1 4 1 10 7 10" /><polyline points="23 20 23 14 17 14" /><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 0 1 3.51 15" />
           </svg>

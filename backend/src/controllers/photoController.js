@@ -1,9 +1,20 @@
+const path = require('path');
 const { Op } = require('sequelize');
 const { Event, Guest, Photo } = require('../models');
-const { EVENT_STATUS, FILTERS } = require('../config/constants');
+const {
+  EVENT_STATUS, FILTERS,
+  ALLOWED_MIME, ALLOWED_VIDEO_MIME, MAX_VIDEO_SECONDS,
+} = require('../config/constants');
 const storage = require('../config/storage');
-const { makeThumbnail, getDimensions } = require('../utils/thumbnail');
+const { makeThumbnail, getDimensions, applyWatermark } = require('../utils/thumbnail');
 const { streamZip } = require('../utils/generateZip');
+
+// Chave segura: relativa a events/, sem escapar do diretorio de uploads
+function isSafeKey(key) {
+  if (typeof key !== 'string' || !key.startsWith('events/')) return false;
+  const normalized = path.posix.normalize(key);
+  return normalized === key && !normalized.includes('..') && !path.isAbsolute(normalized);
+}
 
 // POST /api/photos/upload-url  (convidado) — gera URL de upload
 async function getUploadUrl(req, res, next) {
@@ -19,11 +30,20 @@ async function getUploadUrl(req, res, next) {
       return res.status(403).json({ error: 'Voce ja usou todas as suas fotos.' });
     }
 
-    const { fileName, fileType } = req.body;
+    const { fileName, fileType, mediaType } = req.body;
+    const isVideo = mediaType === 'video';
+
+    // Valida o tipo de arquivo conforme a midia
+    const allowed = isVideo ? ALLOWED_VIDEO_MIME : ALLOWED_MIME;
+    const type = fileType || (isVideo ? 'video/webm' : 'image/jpeg');
+    if (!allowed.includes(type)) {
+      return res.status(400).json({ error: 'Tipo de arquivo nao permitido.' });
+    }
+
     const { uploadUrl, method, key } = await storage.getUploadUrl({
       eventId: event.id,
-      fileName: fileName || 'foto.jpg',
-      fileType: fileType || 'image/jpeg',
+      fileName: fileName || (isVideo ? 'video.webm' : 'foto.jpg'),
+      fileType: type,
       appUrl: process.env.APP_URL,
     });
 
@@ -39,7 +59,8 @@ async function localStorageUpload(req, res, next) {
   try {
     if (storage.useS3) return res.status(400).json({ error: 'Storage local desabilitado.' });
     const key = decodeURIComponent(req.params.key);
-    if (!key.startsWith('events/')) return res.status(400).json({ error: 'Chave invalida.' });
+    // Protecao contra path traversal (ex.: events/../../etc)
+    if (!isSafeKey(key)) return res.status(400).json({ error: 'Chave invalida.' });
     const buffer = req.rawBuffer;
     if (!buffer || !buffer.length) return res.status(400).json({ error: 'Arquivo vazio.' });
     await storage.saveLocal(key, buffer);
@@ -62,19 +83,41 @@ async function create(req, res, next) {
       return res.status(403).json({ error: 'Voce ja usou todas as suas fotos.' });
     }
 
-    const { storageKey, filter } = req.body;
-    if (!storageKey) return res.status(400).json({ error: 'storageKey ausente.' });
+    const { storageKey, filter, mediaType, durationSeconds } = req.body;
+    if (!storageKey || !isSafeKey(storageKey)) {
+      return res.status(400).json({ error: 'storageKey ausente ou invalida.' });
+    }
+    const isVideo = mediaType === 'video';
     const usedFilter = FILTERS.includes(filter) ? filter : event.defaultFilter;
 
-    // Thumbnail (modo local + sharp disponivel)
+    // Valida duracao do video
+    let duration = null;
+    if (isVideo) {
+      duration = Number(durationSeconds) || null;
+      if (duration && duration > MAX_VIDEO_SECONDS + 1) {
+        return res.status(400).json({ error: `Videos podem ter no maximo ${MAX_VIDEO_SECONDS} segundos.` });
+      }
+    }
+
+    // Pos-processamento de fotos (modo local + sharp disponivel)
     let thumbKey = null;
     let dims = {};
-    if (!storage.useS3) {
+    if (!isVideo && !storage.useS3) {
       try {
         const fs = require('fs');
         const fullPath = storage.localPath(storageKey);
         if (fs.existsSync(fullPath)) {
-          const buf = await fs.promises.readFile(fullPath);
+          let buf = await fs.promises.readFile(fullPath);
+
+          // Marca d'agua no plano gratuito (CTA de crescimento)
+          if (event.planId === 'free') {
+            const marked = await applyWatermark(buf);
+            if (marked) {
+              await storage.saveLocal(storageKey, marked);
+              buf = marked;
+            }
+          }
+
           dims = await getDimensions(buf);
           const thumb = await makeThumbnail(buf);
           if (thumb) {
@@ -90,6 +133,8 @@ async function create(req, res, next) {
       guestId: guest.id,
       storageKey,
       thumbKey,
+      mediaType: isVideo ? 'video' : 'photo',
+      durationSeconds: duration,
       filter: usedFilter,
       width: dims.width || null,
       height: dims.height || null,
@@ -118,6 +163,8 @@ async function withUrls(photo) {
   return {
     id: photo.id,
     filter: photo.filter,
+    mediaType: photo.mediaType || 'photo',
+    durationSeconds: photo.durationSeconds,
     width: photo.width,
     height: photo.height,
     createdAt: photo.createdAt,
@@ -158,7 +205,15 @@ async function listForEvent(req, res, next) {
       })
     );
 
-    res.json({ revealed: true, total: count, photos, hasMore: offset + rows.length < count });
+    res.json({
+      revealed: true,
+      total: count,
+      photos,
+      hasMore: offset + rows.length < count,
+      // Plano gratuito exibe CTA "Crie o seu evento" no album
+      showBranding: event.planId === 'free',
+      eventName: event.name,
+    });
   } catch (err) {
     next(err);
   }
@@ -198,7 +253,10 @@ async function downloadZip(req, res, next) {
 
     const fs = require('fs');
     const files = photos
-      .map((p, i) => ({ path: storage.localPath(p.storageKey), name: `${String(i + 1).padStart(3, '0')}.jpg` }))
+      .map((p, i) => {
+        const ext = (path.extname(p.storageKey) || '.jpg').toLowerCase();
+        return { path: storage.localPath(p.storageKey), name: `${String(i + 1).padStart(3, '0')}${ext}` };
+      })
       .filter((f) => fs.existsSync(f.path));
 
     await streamZip(res, files, `album-${event.slug}.zip`);

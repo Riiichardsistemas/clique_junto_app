@@ -18,6 +18,7 @@ function publicEvent(event) {
     isAcceptingPhotos: event.isAcceptingPhotos(),
     isRevealed: event.isRevealed(),
     recapVideoUrl: event.isRevealed() ? event.recapVideoUrl : null,
+    showBranding: event.planId === 'free',
   };
 }
 

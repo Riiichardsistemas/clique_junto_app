@@ -11,6 +11,9 @@ module.exports = (sequelize) => {
       // Chave/identificador no storage (S3 key ou caminho local relativo)
       storageKey: { type: DataTypes.STRING, allowNull: false },
       thumbKey: { type: DataTypes.STRING, allowNull: true },
+      // 'photo' | 'video'
+      mediaType: { type: DataTypes.ENUM('photo', 'video'), allowNull: false, defaultValue: 'photo' },
+      durationSeconds: { type: DataTypes.FLOAT, allowNull: true },
       filter: { type: DataTypes.ENUM(...FILTERS), allowNull: false, defaultValue: 'nenhum' },
       width: { type: DataTypes.INTEGER, allowNull: true },
       height: { type: DataTypes.INTEGER, allowNull: true },

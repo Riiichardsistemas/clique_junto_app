@@ -35,4 +35,31 @@ async function getDimensions(buffer) {
   }
 }
 
-module.exports = { makeThumbnail, getDimensions, hasSharp: !!sharp };
+/**
+ * Marca d'agua discreta (plano gratuito). Texto no canto inferior direito.
+ * Retorna null se sharp indisponivel ou em caso de erro (segue sem marca).
+ */
+async function applyWatermark(buffer, text = 'feito com Era Uma Vez') {
+  if (!sharp) return null;
+  try {
+    const img = sharp(buffer).rotate();
+    const meta = await img.metadata();
+    const w = meta.width || 1200;
+    const fontSize = Math.max(16, Math.round(w * 0.02));
+    const pad = Math.round(fontSize * 0.9);
+    const svg = `<svg width="${w}" height="${fontSize + pad * 2}" xmlns="http://www.w3.org/2000/svg">
+      <text x="${w - pad}" y="${fontSize + pad}" text-anchor="end"
+        font-family="Georgia, 'Times New Roman', serif" font-style="italic"
+        font-size="${fontSize}" fill="#ffffff" fill-opacity="0.5"
+        stroke="#000000" stroke-opacity="0.15" stroke-width="0.5">${text}</text>
+    </svg>`;
+    return await img
+      .composite([{ input: Buffer.from(svg), gravity: 'southeast' }])
+      .jpeg({ quality: 88 })
+      .toBuffer();
+  } catch (e) {
+    return null;
+  }
+}
+
+module.exports = { makeThumbnail, getDimensions, applyWatermark, hasSharp: !!sharp };

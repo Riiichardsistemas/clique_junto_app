@@ -13,11 +13,11 @@ export const photoApi = {
    * Solicita URL de upload para o backend.
    * Returns: { uploadUrl, method, key, storageMode }
    */
-  getUploadUrl: (slug, fileName, fileType) =>
+  getUploadUrl: (slug, fileName, fileType, mediaType = 'photo') =>
     axios
       .post(
         `${BASE}/photos/upload-url`,
-        { fileName, fileType },
+        { fileName, fileType, mediaType },
         { headers: guestHeaders(slug) }
       )
       .then((r) => r.data),
@@ -38,11 +38,11 @@ export const photoApi = {
    * Salva metadados após upload.
    * storageKey = chave retornada por getUploadUrl
    */
-  savePhoto: (slug, storageKey, filter) =>
+  savePhoto: (slug, { storageKey, filter, mediaType = 'photo', durationSeconds = null }) =>
     axios
       .post(
         `${BASE}/photos`,
-        { storageKey, filter },
+        { storageKey, filter, mediaType, durationSeconds },
         { headers: guestHeaders(slug) }
       )
       .then((r) => r.data),

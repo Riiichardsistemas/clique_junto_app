@@ -9,6 +9,7 @@ import EventDashboard from './pages/events/EventDashboard.jsx';
 import GuestEntry from './pages/guest/GuestEntry.jsx';
 import Camera from './pages/guest/Camera.jsx';
 import Album from './pages/guest/Album.jsx';
+import MyAlbums from './pages/guest/MyAlbums.jsx';
 import ProtectedRoute from './components/layout/ProtectedRoute.jsx';
 
 export default function App() {
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="/e/:slug"          element={<GuestEntry />} />
         <Route path="/e/:slug/camera"   element={<Camera />} />
         <Route path="/e/:slug/album"    element={<Album />} />
+        <Route path="/albuns"           element={<MyAlbums />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

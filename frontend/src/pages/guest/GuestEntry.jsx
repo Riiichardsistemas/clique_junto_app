@@ -157,6 +157,11 @@ export default function GuestEntry() {
                 ) : 'Entrar e fotografar'}
               </button>
 
+              {(event?.photoLimitPerGuest ?? 0) > 0 && (
+                <p className="text-center text-xs text-cream/40">
+                  Seu filme tem <span className="text-gold/80">{event.photoLimitPerGuest} frames</span> — fotos ou vídeos de 15s. Use com carinho 🎞️
+                </p>
+              )}
               <p className="text-center text-xs text-cream/30">Sem cadastro · Sem download · No navegador</p>
               <Link to={`/e/${slug}/album`} className="block text-center text-sm text-cream/45 transition hover:text-gold">
                 Ver álbum →

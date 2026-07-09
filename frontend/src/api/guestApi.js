@@ -4,13 +4,22 @@ const BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
 const GUEST_TOKEN_PREFIX = 'euv_guest_';
 
+// localStorage: convidado que fecha a aba não perde a sessão (nem "gasta"
+// outra vaga do evento ao voltar). Migra tokens antigos do sessionStorage.
 export function getGuestToken(slug) {
-  return sessionStorage.getItem(GUEST_TOKEN_PREFIX + slug);
+  const key = GUEST_TOKEN_PREFIX + slug;
+  let token = localStorage.getItem(key);
+  if (!token) {
+    token = sessionStorage.getItem(key);
+    if (token) { localStorage.setItem(key, token); sessionStorage.removeItem(key); }
+  }
+  return token;
 }
 
 export function setGuestToken(slug, token) {
-  if (token) sessionStorage.setItem(GUEST_TOKEN_PREFIX + slug, token);
-  else sessionStorage.removeItem(GUEST_TOKEN_PREFIX + slug);
+  const key = GUEST_TOKEN_PREFIX + slug;
+  if (token) localStorage.setItem(key, token);
+  else { localStorage.removeItem(key); sessionStorage.removeItem(key); }
 }
 
 function guestHeaders(slug) {

@@ -3,6 +3,35 @@ import { useParams, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { guestApi } from '../../api/guestApi';
 import { photoApi } from '../../api/photoApi';
+import { FILTER_DEFS } from '../../utils/filters';
+
+// Vídeos têm o filtro aplicado via CSS na exibição
+function videoFilterCss(p) {
+  return FILTER_DEFS[p.filter]?.cssFilter || 'none';
+}
+
+function extFromUrl(url, mediaType) {
+  const m = String(url).split('?')[0].match(/\.(\w{2,5})$/);
+  if (m) return `.${m[1].toLowerCase()}`;
+  return mediaType === 'video' ? '.webm' : '.jpg';
+}
+
+// CTA de crescimento — exibido apenas no plano gratuito
+function GrowthCTA({ slug }) {
+  return (
+    <div className="mx-auto mt-10 max-w-md rounded-3xl border border-gold/20 bg-gold/[0.06] p-6 text-center">
+      <p className="font-serif text-xl text-cream">Gostou desse álbum?</p>
+      <p className="mt-2 text-sm text-cream/50">
+        Crie a sua câmera descartável digital em minutos — grátis, sem app.
+      </p>
+      <Link to={`/register?utm_source=album&utm_medium=cta&utm_campaign=${slug}`}
+        className="btn-primary mt-4 inline-block rounded-2xl px-8 py-3 text-sm">
+        Criar meu evento grátis
+      </Link>
+      <p className="label-mono mt-3 text-cream/25">feito com Era Uma Vez</p>
+    </div>
+  );
+}
 
 function Loader() {
   return (
@@ -75,9 +104,14 @@ function AlbumLocked({ event, slug }) {
 
         <p className="mt-8 text-xs text-cream/30">Atualiza automaticamente a cada 30s</p>
 
-        <Link to={`/e/${slug}/camera`} className="btn-ghost mt-6 inline-flex rounded-2xl px-6 py-3 text-sm">
-          ← Voltar para câmera
-        </Link>
+        <div className="mt-6 flex justify-center gap-3">
+          <Link to={`/e/${slug}/camera`} className="btn-ghost rounded-2xl px-6 py-3 text-sm">
+            ← Câmera
+          </Link>
+          <Link to="/albuns" className="btn-ghost rounded-2xl px-6 py-3 text-sm">
+            Meus álbuns
+          </Link>
+        </div>
       </div>
     </div>
   );
@@ -93,6 +127,7 @@ export default function Album() {
   const [notFound, setNotFound] = useState(false);
   const [selected, setSelected] = useState(null);
   const [downloading, setDownloading] = useState(false);
+  const [showBranding, setShowBranding] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -101,6 +136,7 @@ export default function Album() {
       const pd = await photoApi.listForEvent(ed.event.id);
       setRevealed(!!pd.revealed || !!ed.event.isRevealed);
       setPhotos(pd.photos || []);
+      setShowBranding(!!pd.showBranding || !!ed.event.showBranding);
     } catch (e) {
       if (e?.response?.status === 404) setNotFound(true);
     } finally {
@@ -123,7 +159,7 @@ export default function Album() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${slug}-${String(index + 1).padStart(3, '0')}.jpg`;
+    a.download = `${slug}-${String(index + 1).padStart(3, '0')}${extFromUrl(photo.url, photo.mediaType)}`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -155,14 +191,22 @@ export default function Album() {
           <Link to={`/e/${slug}/camera`} className="text-sm text-cream/40 transition hover:text-cream/70">← Câmera</Link>
           <div className="text-center">
             <p className="font-serif text-base leading-none">{event?.name}</p>
-            <p className="label-mono mt-1 text-gold/70">{photos.length} fotos · revelado</p>
+            <p className="label-mono mt-1 text-gold/70">
+              {photos.length} {photos.some((p) => p.mediaType === 'video') ? 'memórias' : 'fotos'} · revelado
+            </p>
           </div>
-          {photos.length > 0 ? (
-            <button onClick={downloadAll} disabled={downloading}
-              className="rounded-xl border border-cream/15 px-3 py-1.5 text-xs text-cream/70 transition hover:text-cream disabled:opacity-50">
-              {downloading ? '…' : 'Baixar'}
-            </button>
-          ) : <span className="w-12" />}
+          <div className="flex items-center gap-2">
+            <Link to="/albuns"
+              className="rounded-xl border border-cream/15 px-3 py-1.5 text-xs text-cream/70 transition hover:text-cream">
+              Álbuns
+            </Link>
+            {photos.length > 0 && (
+              <button onClick={downloadAll} disabled={downloading}
+                className="rounded-xl border border-cream/15 px-3 py-1.5 text-xs text-cream/70 transition hover:text-cream disabled:opacity-50">
+                {downloading ? '…' : 'Baixar'}
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -178,14 +222,39 @@ export default function Album() {
             <div className="columns-2 gap-2 sm:columns-3 lg:columns-4">
               {photos.map((p, i) => (
                 <button key={p.id} onClick={() => setSelected(i)}
-                  className="group mb-2 block w-full overflow-hidden rounded-xl border border-cream/[0.06]">
-                  <img src={p.thumbUrl || p.url} alt={`Foto ${i + 1}`} loading="lazy"
-                    className="w-full transition-transform duration-300 group-hover:scale-[1.03]" />
+                  className="group relative mb-2 block w-full overflow-hidden rounded-xl border border-cream/[0.06]">
+                  {p.mediaType === 'video' ? (
+                    <>
+                      <video src={p.url} muted playsInline preload="metadata"
+                        style={{ filter: videoFilterCss(p) }}
+                        className="w-full transition-transform duration-300 group-hover:scale-[1.03]" />
+                      <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-ink/60 backdrop-blur-sm">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="rgba(245,240,230,0.9)"><path d="M8 5v14l11-7z" /></svg>
+                        </span>
+                      </span>
+                      {p.durationSeconds && (
+                        <span className="pointer-events-none absolute bottom-2 right-2 rounded-md bg-ink/70 px-1.5 py-0.5 font-mono text-[10px] text-cream/80">
+                          {Math.round(p.durationSeconds)}s
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <img src={p.thumbUrl || p.url} alt={`Foto ${i + 1}`} loading="lazy"
+                      className="w-full transition-transform duration-300 group-hover:scale-[1.03]" />
+                  )}
+                  {p.guestNickname && (
+                    <span className="pointer-events-none absolute bottom-0 left-0 right-0 bg-gradient-to-t from-ink/80 to-transparent px-2.5 pb-1.5 pt-5 text-left text-[11px] text-cream/70 opacity-0 transition-opacity group-hover:opacity-100">
+                      por {p.guestNickname}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
           </>
         )}
+
+        {showBranding && photos.length > 0 && <GrowthCTA slug={slug} />}
       </main>
 
       {/* Lightbox */}
@@ -194,12 +263,22 @@ export default function Album() {
           <button className="absolute right-5 top-5 text-2xl text-cream/50 hover:text-cream/90" onClick={() => setSelected(null)}>✕</button>
           <button className="absolute left-3 top-1/2 -translate-y-1/2 px-2 text-3xl text-cream/40 hover:text-cream/80"
             onClick={(e) => { e.stopPropagation(); setSelected((s) => Math.max(0, s - 1)); }}>‹</button>
-          <img src={photos[selected]?.url} alt="Foto" className="max-h-[88vh] max-w-[92vw] rounded-2xl object-contain"
-            onClick={(e) => e.stopPropagation()} />
+          {photos[selected]?.mediaType === 'video' ? (
+            <video src={photos[selected]?.url} autoPlay loop controls playsInline
+              style={{ filter: videoFilterCss(photos[selected]) }}
+              className="max-h-[88vh] max-w-[92vw] rounded-2xl object-contain"
+              onClick={(e) => e.stopPropagation()} />
+          ) : (
+            <img src={photos[selected]?.url} alt="Foto" className="max-h-[88vh] max-w-[92vw] rounded-2xl object-contain"
+              onClick={(e) => e.stopPropagation()} />
+          )}
           <button className="absolute right-3 top-1/2 -translate-y-1/2 px-2 text-3xl text-cream/40 hover:text-cream/80"
             onClick={(e) => { e.stopPropagation(); setSelected((s) => Math.min(photos.length - 1, s + 1)); }}>›</button>
           <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-4">
-            <p className="film-counter">{selected + 1} / {photos.length}</p>
+            <p className="film-counter">
+              {selected + 1} / {photos.length}
+              {photos[selected]?.guestNickname && <span className="text-cream/50"> · por {photos[selected].guestNickname}</span>}
+            </p>
             <button onClick={(e) => { e.stopPropagation(); downloadOne(photos[selected], selected); }}
               className="film-counter text-gold/80 hover:text-gold">baixar ↓</button>
           </div>

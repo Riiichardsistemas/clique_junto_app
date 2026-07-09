@@ -12,7 +12,8 @@ router.post('/upload-url', uploadLimiter, guestMiddleware, ctrl.getUploadUrl);
 router.post('/', uploadLimiter, guestMiddleware, ctrl.create);
 
 // Upload local (recebe bytes crus). Sem multipart; corpo binario.
-router.put('/storage/:key', express.raw({ type: '*/*', limit: '20mb' }), (req, res, next) => {
+// 40mb acomoda videos de ate 15s (MAX_VIDEO_BYTES).
+router.put('/storage/:key', express.raw({ type: '*/*', limit: '40mb' }), (req, res, next) => {
   req.rawBuffer = req.body && req.body.length ? req.body : null;
   next();
 }, ctrl.localStorageUpload);
