@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
+import { Copy, Download, Share2, Check } from 'lucide-react';
 
 export default function QRCodeDisplay({ event }) {
   const [blobUrl, setBlobUrl] = useState(null);
   const [error,   setError]   = useState(false);
+  const [copied,  setCopied]  = useState(false);
   const guestUrl = `${window.location.origin}/e/${event.slug}`;
 
   // Busca o QR via axios (envia Authorization header) e converte em blob URL
@@ -20,7 +22,11 @@ export default function QRCodeDisplay({ event }) {
   }, [event.id]);
 
   function copyLink() {
-    navigator.clipboard.writeText(guestUrl).then(() => toast.success('Link copiado!'));
+    navigator.clipboard.writeText(guestUrl).then(() => {
+      setCopied(true);
+      toast.success('Link copiado!');
+      setTimeout(() => setCopied(false), 2000);
+    });
   }
 
   function shareWhatsApp() {
@@ -39,13 +45,13 @@ export default function QRCodeDisplay({ event }) {
   }
 
   return (
-    <div className="flex flex-col items-center gap-5">
+    <div className="flex flex-col items-center gap-6">
       {/* QR Code */}
-      <div className="rounded-2xl bg-white p-4 shadow-lg">
+      <div className="rounded-3xl bg-white p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.1),0_24px_60px_-20px_rgba(255,255,255,0.15)]">
         {blobUrl ? (
           <img src={blobUrl} alt="QR Code" className="h-48 w-48" />
         ) : error ? (
-          <div className="flex h-48 w-48 items-center justify-center text-center text-xs text-gray-400 px-4">
+          <div className="flex h-48 w-48 items-center justify-center px-4 text-center text-xs text-gray-400">
             Erro ao carregar QR Code
           </div>
         ) : (
@@ -56,17 +62,27 @@ export default function QRCodeDisplay({ event }) {
       </div>
 
       {/* Link */}
-      <p className="max-w-xs break-all text-center text-xs text-cream/40">{guestUrl}</p>
+      <button
+        onClick={copyLink}
+        className="group flex max-w-full items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 transition hover:border-gold/40"
+        title="Copiar link"
+      >
+        <span className="truncate font-mono text-xs text-cream-dim group-hover:text-cream">
+          {guestUrl.replace(/^https?:\/\//, '')}
+        </span>
+        {copied
+          ? <Check size={13} className="shrink-0 text-emerald-400" />
+          : <Copy size={13} className="shrink-0 text-cream-dim/70 group-hover:text-cream" />}
+      </button>
 
       {/* Ações */}
       <div className="flex flex-wrap justify-center gap-2">
-        <button onClick={copyLink} className="btn-ghost px-4 py-2 text-sm">
-          Copiar link
-        </button>
         <button onClick={downloadQR} disabled={!blobUrl} className="btn-ghost px-4 py-2 text-sm disabled:opacity-40">
+          <Download size={15} />
           Baixar QR
         </button>
         <button onClick={shareWhatsApp} className="btn-primary px-4 py-2 text-sm">
+          <Share2 size={15} />
           WhatsApp
         </button>
       </div>

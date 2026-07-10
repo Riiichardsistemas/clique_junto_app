@@ -219,6 +219,36 @@ async function listForEvent(req, res, next) {
   }
 }
 
+// GET /api/photos/event/:eventId/admin  (organizador) — lista TODAS as fotos sem restrição de revelação
+async function listForEventAdmin(req, res, next) {
+  try {
+    const event = await Event.findOne({ where: { id: req.params.eventId, userId: req.user.id } });
+    if (!event) return res.status(404).json({ error: 'Evento não encontrado.' });
+
+    const limit = Math.min(Number(req.query.limit) || 60, 200);
+    const offset = Number(req.query.offset) || 0;
+
+    const { rows, count } = await Photo.findAndCountAll({
+      where: { eventId: event.id },
+      include: [{ model: Guest, as: 'guest', attributes: ['id', 'nickname'] }],
+      order: [['createdAt', 'ASC']],
+      limit,
+      offset,
+    });
+
+    const photos = await Promise.all(
+      rows.map(async (p) => {
+        const base = await withUrls(p);
+        return { ...base, guestNickname: p.guest ? p.guest.nickname : null };
+      })
+    );
+
+    res.json({ total: count, photos, hasMore: offset + rows.length < count });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // DELETE /api/photos/:id  (organizador) — moderacao
 async function remove(req, res, next) {
   try {
@@ -266,5 +296,5 @@ async function downloadZip(req, res, next) {
 }
 
 module.exports = {
-  getUploadUrl, localStorageUpload, create, listForEvent, remove, downloadZip, withUrls,
+  getUploadUrl, localStorageUpload, create, listForEvent, listForEventAdmin, remove, downloadZip, withUrls,
 };

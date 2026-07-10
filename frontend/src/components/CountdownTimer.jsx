@@ -33,25 +33,25 @@ export default function CountdownTimer({ target, label, onExpire, className = ''
 
   return (
     <div className={className}>
-      {label && <p className="mb-2 text-xs uppercase tracking-widest text-white/50">{label}</p>}
+      {label && <p className="mb-2 text-xs uppercase tracking-widest text-cream-dim">{label}</p>}
       <div className="flex items-end gap-3 font-serif text-3xl tabular-nums text-white">
         {t.d > 0 && (
           <span>
             <span>{t.d}</span>
-            <span className="ml-0.5 font-sans text-base text-white/40">d</span>
+            <span className="ml-0.5 font-sans text-base text-cream-dim">d</span>
           </span>
         )}
         <span>
           {pad(t.h)}
-          <span className="ml-0.5 font-sans text-base text-white/40">h</span>
+          <span className="ml-0.5 font-sans text-base text-cream-dim">h</span>
         </span>
         <span>
           {pad(t.m)}
-          <span className="ml-0.5 font-sans text-base text-white/40">m</span>
+          <span className="ml-0.5 font-sans text-base text-cream-dim">m</span>
         </span>
         <span>
           {pad(t.s)}
-          <span className="ml-0.5 font-sans text-base text-white/40">s</span>
+          <span className="ml-0.5 font-sans text-base text-cream-dim">s</span>
         </span>
       </div>
     </div>

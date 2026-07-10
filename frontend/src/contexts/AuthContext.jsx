@@ -60,6 +60,10 @@ export function AuthProvider({ children }) {
     dispatch({ type: 'LOGOUT' });
   }, []);
 
+  const setUser = useCallback((user) => {
+    dispatch({ type: 'SET_USER', payload: user });
+  }, []);
+
   const value = {
     user: state.user,
     loading: state.loading,
@@ -67,6 +71,7 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
+    setUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

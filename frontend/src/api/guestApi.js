@@ -35,8 +35,8 @@ export const guestApi = {
   getEvent: (slug) =>
     axios.get(`${BASE}/guests/event/${slug}`).then((r) => r.data),
 
-  join: (slug, nickname) =>
-    axios.post(`${BASE}/guests/join`, { slug, nickname }).then((r) => r.data),
+  join: (slug, nickname, email) =>
+    axios.post(`${BASE}/guests/join`, { slug, nickname, email }).then((r) => r.data),
 
   me: (slug) =>
     axios

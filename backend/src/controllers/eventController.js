@@ -3,6 +3,8 @@ const { Event, Guest, Photo } = require('../models');
 const { EVENT_STATUS, EVENT_TYPES, FILTERS } = require('../config/constants');
 const { getPlan } = require('../config/plans');
 const { generateUniqueSlug } = require('../utils/generateSlug');
+const { sendMail } = require('../config/mailer');
+const templates = require('../utils/emailTemplates');
 
 // Serializa o evento adicionando estado calculado
 function serialize(event, extra = {}) {
@@ -163,6 +165,18 @@ async function reveal(req, res, next) {
       Photo.count({ where: { eventId: event.id } }),
     ]);
     res.json({ event: serialize(event, { guestCount, photoCount }), message: 'Album revelado!' });
+
+    // Notifica convidados com email em background
+    const base = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0];
+    const albumUrl = `${base}/e/${event.slug}/album`;
+    Guest.findAll({ where: { eventId: event.id, email: { [Op.not]: null } } })
+      .then((guests) => {
+        guests.forEach((g) => {
+          sendMail({ to: g.email, ...templates.guestAlbumReady(g.nickname || 'convidado', event.name, albumUrl) })
+            .catch(() => {});
+        });
+      })
+      .catch(() => {});
   } catch (err) {
     next(err);
   }
@@ -213,6 +227,33 @@ async function banGuest(req, res, next) {
   }
 }
 
+// DELETE /api/events/:id — remove evento, convidados e arquivos de fotos
+async function destroy(req, res, next) {
+  try {
+    const event = await loadOwned(req, res);
+    if (!event) return;
+
+    // Remove arquivos do storage antes de deletar os registros
+    const photos = await Photo.findAll({ where: { eventId: event.id } });
+    const storage = require('../config/storage');
+    await Promise.all(
+      photos.flatMap((p) => [
+        storage.remove(p.storageKey).catch(() => {}),
+        p.thumbKey ? storage.remove(p.thumbKey).catch(() => {}) : null,
+      ].filter(Boolean))
+    );
+
+    // Cascade: fotos e convidados
+    await Photo.destroy({ where: { eventId: event.id } });
+    await Guest.destroy({ where: { eventId: event.id } });
+    await event.destroy();
+
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
-  list, create, getOne, update, close, reveal, publish, listGuests, banGuest, loadOwned, serialize,
+  list, create, getOne, update, close, reveal, publish, destroy, listGuests, banGuest, loadOwned, serialize,
 };

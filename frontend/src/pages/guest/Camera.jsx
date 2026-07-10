@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { X, ImagePlus, SwitchCamera } from 'lucide-react';
 import { guestApi } from '../../api/guestApi';
 import { FILTER_DEFS, applyFilterToBlob } from '../../utils/filters';
 import { enqueueUpload, subscribeQueue, processQueue } from '../../utils/uploadQueue';
@@ -294,8 +295,8 @@ export default function Camera() {
 
       setPhotoCount((c) => c + 1);
       handleRetake();
-      showToast(navigator.onLine ? (isVideo ? 'Vídeo guardado 🎬' : 'Foto guardada 🎞️')
-        : 'Guardado! Envia quando a conexão voltar 📡');
+      showToast(navigator.onLine ? (isVideo ? 'Vídeo guardado' : 'Foto guardada')
+        : 'Guardado! Envia quando a conexão voltar');
     } catch {
       showToast('Erro ao guardar. Tente novamente.', 'error');
     } finally {
@@ -339,7 +340,7 @@ export default function Camera() {
   if (!unlimited && remaining <= 0) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-ink-deep px-6 text-center text-cream">
-        <p className="font-serif text-3xl">Filme completo! 🎞️</p>
+        <p className="font-serif text-3xl font-semibold tracking-tight">Filme completo</p>
         <p className="max-w-xs text-sm text-cream/45">
           Você usou seus {maxPhotos} frames. Suas memórias estão guardadas para a revelação.
         </p>
@@ -378,8 +379,8 @@ export default function Camera() {
               {String(recordSecs).padStart(2, '0')}s / {MAX_VIDEO_SECONDS}s
             </span>
           )}
-          <Link to={`/e/${slug}/album`} className="flex h-9 w-9 items-center justify-center rounded-full border border-cream/15 bg-ink/40 text-cream/70 backdrop-blur-sm transition hover:text-cream">
-            ✕
+          <Link to={`/e/${slug}/album`} className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/40 text-white/70 backdrop-blur-md transition hover:bg-black/60 hover:text-white">
+            <X size={16} />
           </Link>
         </div>
       </div>
@@ -448,10 +449,8 @@ export default function Camera() {
       {/* Controles */}
       <div className="flex items-center justify-between bg-ink-deep px-10 py-5">
         <button onClick={() => fileRef.current?.click()} disabled={recording}
-          className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cream/15 bg-cream/[0.04] text-cream/60 transition hover:text-cream disabled:opacity-30">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
-          </svg>
+          className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/15 bg-white/[0.04] text-white/60 transition hover:bg-white/[0.08] hover:text-white disabled:opacity-30">
+          <ImagePlus size={21} strokeWidth={1.7} />
         </button>
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
 
@@ -471,10 +470,8 @@ export default function Camera() {
         )}
 
         <button onClick={flipCamera} disabled={recording}
-          className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cream/15 bg-cream/[0.04] text-cream/60 transition hover:text-cream disabled:opacity-30">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="1 4 1 10 7 10" /><polyline points="23 20 23 14 17 14" /><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 0 1 3.51 15" />
-          </svg>
+          className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/15 bg-white/[0.04] text-white/60 transition hover:bg-white/[0.08] hover:text-white disabled:opacity-30">
+          <SwitchCamera size={21} strokeWidth={1.7} />
         </button>
       </div>
     </div>

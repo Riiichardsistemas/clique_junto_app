@@ -1,112 +1,79 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { guestApi } from '../../api/guestApi';
-import { photoApi } from '../../api/photoApi';
+import { Link, useNavigate } from 'react-router-dom';
+import { eventApi } from '../../api/eventApi';
+import AppHeader from '../../components/layout/AppHeader';
 
-const GUEST_TOKEN_PREFIX = 'euv_guest_';
+const STATUS_MAP = {
+  draft:    { label: 'Rascunho',    color: 'text-cream/40' },
+  active:   { label: 'Ativo',       color: 'text-green-400' },
+  closed:   { label: 'Encerrado',   color: 'text-amber-400' },
+  revealed: { label: 'Revelado',    color: 'text-gold' },
+};
 
-// Slugs de todos os eventos que este navegador já participou
-function getJoinedSlugs() {
-  const slugs = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key?.startsWith(GUEST_TOKEN_PREFIX)) slugs.push(key.slice(GUEST_TOKEN_PREFIX.length));
-  }
-  return slugs;
-}
-
-function formatEventDate(iso) {
+function formatDate(iso) {
   if (!iso) return null;
-  const d = new Date(iso);
-  if (isNaN(d)) return null;
-  return d.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(iso).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-// Contagem regressiva compacta ("2d", "5h", "32min")
-function shortCountdown(revealAt, now) {
-  if (!revealAt) return null;
-  const diff = new Date(revealAt).getTime() - now;
-  if (diff <= 0) return null;
-  const d = Math.floor(diff / 86400000);
-  if (d >= 1) return `${d}d`;
-  const h = Math.floor(diff / 3600000);
-  if (h >= 1) return `${h}h`;
-  return `${Math.max(1, Math.floor(diff / 60000))}min`;
-}
-
-function LockIcon({ size = 16 }) {
+function LockIcon() {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
       stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
   );
 }
 
-/**
- * Capa do álbum no estilo iOS Photos:
- * - Revelado: foto de capa (primeira do evento)
- * - Bloqueado: mosaico borrado + cadeado + countdown
- */
-function AlbumCard({ album, now }) {
-  const { event, stats, cover, revealed, error } = album;
-  const countdown = shortCountdown(event?.revealAt, now);
-  const count = stats?.photoCount ?? 0;
+function AlbumCard({ event }) {
+  const meta = STATUS_MAP[event.status] || STATUS_MAP.draft;
+  const revealed = event.status === 'revealed';
 
   return (
     <Link
-      to={`/e/${event.slug}/album`}
+      to={`/events/${event.id}/album`}
       className="group block animate-fadein text-left"
     >
-      {/* Capa quadrada, cantos arredondados — assinatura visual do iOS */}
-      <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-cream/[0.07] bg-surface-2">
-        {revealed && cover ? (
-          cover.mediaType === 'video' ? (
-            <video src={cover.url} muted playsInline preload="metadata"
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" />
-          ) : (
-            <img src={cover.thumbUrl || cover.url} alt={event.name} loading="lazy"
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" />
-          )
+      {/* Capa quadrada */}
+      <div className="relative aspect-square w-full overflow-hidden rounded-glass border border-line bg-surface shadow-card transition-all duration-250 group-hover:scale-[1.02] group-hover:border-gold/40">
+        {revealed ? (
+          <div className="flex h-full w-full items-center justify-center bg-cream/[0.04]">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none"
+              stroke="rgba(196,169,108,0.45)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="9" cy="9" r="2" />
+              <path d="m21 15-3.5-3.5L9 20" />
+            </svg>
+          </div>
         ) : (
           <div className="relative h-full w-full">
-            {/* Mosaico de "fotos guardadas" borrado */}
-            <div className="grid h-full w-full grid-cols-3 gap-px opacity-60 blur-[1px]">
+            <div className="grid h-full w-full grid-cols-3 gap-px opacity-40 blur-[1px]">
               {Array.from({ length: 9 }).map((_, i) => (
-                <div key={i} className="animate-pulse-slow bg-cream/[0.05]"
-                  style={{ animationDelay: `${i * 0.15}s` }} />
+                <div key={i} className="animate-pulse-slow bg-cream/[0.06]"
+                  style={{ animationDelay: `${i * 0.12}s` }} />
               ))}
             </div>
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-gold/80">
-              <LockIcon size={22} />
-              {countdown && (
-                <span className="rounded-full bg-ink/70 px-2.5 py-0.5 font-mono text-[11px] text-cream/70 backdrop-blur-sm">
-                  revela em {countdown}
-                </span>
-              )}
+            <div className="absolute inset-0 flex items-center justify-center text-cream/30">
+              <LockIcon />
             </div>
           </div>
         )}
 
-        {/* Badge de contagem (canto inferior direito, como no iOS ao selecionar) */}
-        {count > 0 && (
+        {/* Badge de contagem */}
+        {(event.photoCount ?? 0) > 0 && (
           <span className="absolute bottom-2 right-2 rounded-md bg-ink/70 px-1.5 py-0.5 font-mono text-[10px] text-cream/80 backdrop-blur-sm">
-            {count}
+            {event.photoCount}
           </span>
         )}
 
-        {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-ink/60 text-xs text-cream/40">
-            indisponível
-          </div>
-        )}
+        {/* Status badge */}
+        <span className={`absolute left-2 top-2 rounded-md bg-ink/70 px-1.5 py-0.5 font-mono text-[10px] backdrop-blur-sm ${meta.color}`}>
+          {meta.label}
+        </span>
       </div>
 
-      {/* Legenda: nome + subtítulo cinza, tipografia iOS */}
       <p className="mt-2 truncate text-[15px] font-medium leading-tight text-cream">{event.name}</p>
       <p className="mt-0.5 truncate text-[13px] text-cream/40">
-        {formatEventDate(event.startsAt) || (revealed ? 'Revelado' : 'Em revelação')}
-        {count > 0 && ` · ${count} ${count === 1 ? 'item' : 'itens'}`}
+        {formatDate(event.startsAt) || formatDate(event.createdAt)}
+        {(event.guestCount ?? 0) > 0 && ` · ${event.guestCount} convidados`}
       </p>
     </Link>
   );
@@ -117,108 +84,88 @@ function EmptyState() {
     <div className="flex flex-col items-center px-6 py-24 text-center">
       <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-cream/10 bg-cream/[0.04] text-cream/30">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.5-3.5L9 20" />
+          <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+          <circle cx="12" cy="13" r="3" />
         </svg>
       </div>
       <p className="font-serif text-2xl text-cream/70">Nenhum álbum ainda</p>
       <p className="mx-auto mt-2 max-w-xs text-sm text-cream/35">
-        Quando você entrar em um evento pelo QR Code ou link, o álbum dele aparece aqui.
+        Crie seu primeiro evento para começar a guardar memórias.
       </p>
+      <Link to="/events/new" className="btn-primary mt-6 inline-block rounded-2xl px-6 py-3 text-sm">
+        Criar evento
+      </Link>
     </div>
   );
 }
 
 export default function MyAlbums() {
-  const [albums, setAlbums] = useState(null); // null = carregando
-  const [now, setNow] = useState(Date.now());
-
-  // Relógio para os countdowns dos álbuns bloqueados
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 30000);
-    return () => clearInterval(id);
-  }, []);
+  const navigate = useNavigate();
+  const [events, setEvents] = useState(null);
 
   useEffect(() => {
-    let cancelled = false;
+    eventApi.list()
+      .then((d) => setEvents(d.events || []))
+      .catch(() => navigate('/dashboard'));
+  }, [navigate]);
 
-    async function loadAlbum(slug) {
-      try {
-        const ed = await guestApi.getEvent(slug);
-        const event = ed.event;
-        const revealed = !!event.isRevealed;
-        let cover = null;
-        let photoCount = ed.stats?.photoCount ?? 0;
-
-        if (revealed && photoCount > 0) {
-          try {
-            const pd = await photoApi.listForEvent(event.id, { limit: 1 });
-            cover = pd.photos?.[0] || null;
-            photoCount = pd.total ?? photoCount;
-          } catch { /* capa é opcional */ }
-        }
-
-        return { slug, event, revealed, cover, stats: { photoCount } };
-      } catch {
-        // Evento apagado/indisponível: não exibe
-        return null;
-      }
-    }
-
-    (async () => {
-      const slugs = getJoinedSlugs();
-      const results = await Promise.all(slugs.map(loadAlbum));
-      if (cancelled) return;
-      const valid = results
-        .filter(Boolean)
-        // Mais recentes primeiro (como Eventos do iOS)
-        .sort((a, b) => new Date(b.event.startsAt || 0) - new Date(a.event.startsAt || 0));
-      setAlbums(valid);
-    })();
-
-    return () => { cancelled = true; };
-  }, []);
-
-  const revealedAlbums = (albums || []).filter((a) => a.revealed);
-  const lockedAlbums = (albums || []).filter((a) => !a.revealed);
+  const revealed = (events || []).filter((e) => e.status === 'revealed');
+  const active   = (events || []).filter((e) => e.status === 'active');
+  const others   = (events || []).filter((e) => e.status !== 'revealed' && e.status !== 'active');
 
   return (
-    <div className="min-h-screen bg-ink-deep pb-16 text-cream">
-      {/* Header estilo iOS: label pequeno + large title */}
-      <header className="px-5 pb-2 pt-10">
-        <p className="label-mono text-gold/70">Era Uma Vez</p>
-        <h1 className="mt-1 font-serif text-4xl font-semibold tracking-tight">Álbuns</h1>
+    <div className="min-h-screen pb-16 text-cream">
+      <AppHeader />
+      <header className="mx-auto max-w-6xl px-4 pb-2 pt-7 sm:px-6 sm:pt-10">
+        <p className="label-mono mb-2">Suas memórias</p>
+        <h1 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl md:text-[42px]">Álbuns</h1>
+        <p className="mt-2 text-sm text-cream-dim">
+          Abra o álbum de fotos de qualquer evento seu — revelado ou em andamento.
+        </p>
       </header>
 
-      {albums === null ? (
-        <div className="flex justify-center py-24">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-cream/15 border-t-cream/60" />
+      {events === null ? (
+        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-x-3 gap-y-5 px-4 pt-6 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-6 sm:px-6 sm:pt-8 lg:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="skeleton aspect-square rounded-glass" style={{ animationDelay: `${i * 0.06}s` }} />
+          ))}
         </div>
-      ) : albums.length === 0 ? (
+      ) : events.length === 0 ? (
         <EmptyState />
       ) : (
-        <main className="px-5">
-          {/* Seção: em revelação (bloqueados) */}
-          {lockedAlbums.length > 0 && (
-            <section className="mt-6">
+        <main className="mx-auto max-w-6xl px-4 sm:px-6">
+          {revealed.length > 0 && (
+            <section className="mt-8">
               <div className="mb-3 flex items-baseline justify-between">
-                <h2 className="text-lg font-semibold">Em revelação</h2>
-                <span className="text-[13px] text-cream/35">{lockedAlbums.length}</span>
+                <h2 className="text-lg font-semibold">Revelados</h2>
+                <span className="text-[13px] text-cream/35">{revealed.length}</span>
               </div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
-                {lockedAlbums.map((a) => <AlbumCard key={a.slug} album={a} now={now} />)}
+              <div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-6 lg:grid-cols-4">
+                {revealed.map((ev) => <AlbumCard key={ev.id} event={ev} />)}
               </div>
             </section>
           )}
 
-          {/* Seção: revelados */}
-          {revealedAlbums.length > 0 && (
+          {active.length > 0 && (
             <section className="mt-8">
               <div className="mb-3 flex items-baseline justify-between">
-                <h2 className="text-lg font-semibold">Meus eventos</h2>
-                <span className="text-[13px] text-cream/35">{revealedAlbums.length}</span>
+                <h2 className="text-lg font-semibold">Em andamento</h2>
+                <span className="text-[13px] text-cream/35">{active.length}</span>
               </div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
-                {revealedAlbums.map((a) => <AlbumCard key={a.slug} album={a} now={now} />)}
+              <div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-6 lg:grid-cols-4">
+                {active.map((ev) => <AlbumCard key={ev.id} event={ev} />)}
+              </div>
+            </section>
+          )}
+
+          {others.length > 0 && (
+            <section className="mt-8">
+              <div className="mb-3 flex items-baseline justify-between">
+                <h2 className="text-lg font-semibold">Outros</h2>
+                <span className="text-[13px] text-cream/35">{others.length}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-6 lg:grid-cols-4">
+                {others.map((ev) => <AlbumCard key={ev.id} event={ev} />)}
               </div>
             </section>
           )}

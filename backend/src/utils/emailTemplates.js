@@ -49,4 +49,20 @@ const recapReady = (name, eventName, recapUrl) => ({
     <p>${btn(recapUrl, 'Assistir recap')}</p>`),
 });
 
-module.exports = { welcome, paymentConfirmed, eventRevealed, reminder24h, recapReady };
+const guestAlbumReady = (nickname, eventName, albumUrl) => ({
+  subject: `O álbum "${eventName}" foi revelado! 📸`,
+  html: wrap(`<h2 style="font-family:Georgia,serif;margin-top:0">Suas memórias chegaram, ${nickname || 'convidado'}!</h2>
+    <p style="color:#cfcfcf">O álbum <strong>${eventName}</strong> acaba de ser revelado. Acesse para ver todas as fotos dos participantes.</p>
+    <p>${btn(albumUrl, 'Ver o álbum')}</p>
+    <p style="color:#777;font-size:13px;margin-top:16px">Você recebeu este email porque participou deste evento como convidado.</p>`),
+});
+
+const forgotPassword = (name, resetUrl) => ({
+  subject: 'Redefinir senha — Era Uma Vez',
+  html: wrap(`<h2 style="font-family:Georgia,serif;margin-top:0">Olá, ${name}!</h2>
+    <p style="color:#cfcfcf">Recebemos uma solicitação para redefinir a senha da sua conta. Clique no botão abaixo (válido por 1 hora).</p>
+    <p>${btn(resetUrl, 'Redefinir senha')}</p>
+    <p style="color:#777;font-size:13px;margin-top:16px">Se não foi você, pode ignorar este email — sua senha continua a mesma.</p>`),
+});
+
+module.exports = { welcome, paymentConfirmed, eventRevealed, reminder24h, recapReady, guestAlbumReady, forgotPassword };

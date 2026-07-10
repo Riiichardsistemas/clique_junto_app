@@ -40,7 +40,7 @@ async function getEventBySlug(req, res, next) {
 // POST /api/guests/join — convidado entra, recebe token anonimo
 async function join(req, res, next) {
   try {
-    const { slug, nickname } = req.body;
+    const { slug, nickname, email } = req.body;
     if (!slug) return res.status(400).json({ error: 'Evento nao informado.' });
 
     const event = await Event.findOne({ where: { slug } });
@@ -56,9 +56,17 @@ async function join(req, res, next) {
       return res.status(403).json({ error: 'Este evento atingiu o limite de participantes.' });
     }
 
+    // Valida email se fornecido
+    let guestEmail = null;
+    if (email) {
+      const trimmed = String(email).trim().toLowerCase();
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) guestEmail = trimmed;
+    }
+
     const guest = await Guest.create({
       eventId: event.id,
       nickname: nickname ? String(nickname).trim().slice(0, 40) : null,
+      email: guestEmail,
       userAgent: (req.headers['user-agent'] || '').slice(0, 250),
     });
 
