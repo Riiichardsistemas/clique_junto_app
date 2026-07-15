@@ -5,6 +5,7 @@ const guestRoutes = require('./guests');
 const photoRoutes = require('./photos');
 const paymentRoutes = require('./payments');
 const recapRoutes = require('./recap');
+const adminRoutes = require('./admin');
 
 const router = express.Router();
 
@@ -18,5 +19,6 @@ router.use('/guests', guestRoutes);
 router.use('/photos', photoRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/recap', recapRoutes);
+router.use('/admin', adminRoutes);
 
 module.exports = router;

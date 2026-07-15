@@ -5,6 +5,13 @@ export const eventApi = {
   create: (data) => api.post('/events', data).then((r) => r.data),
   getOne: (id) => api.get(`/events/${id}`).then((r) => r.data),
   update: (id, data) => api.put(`/events/${id}`, data).then((r) => r.data),
+  uploadBrandingImage: (id, slot, file) => {
+    const fd = new FormData();
+    fd.append('image', file);
+    return api.post(`/events/${id}/branding-image?slot=${slot}`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then((r) => r.data);
+  },
   delete: (id) => api.delete(`/events/${id}`).then((r) => r.data),
   close: (id) => api.post(`/events/${id}/close`).then((r) => r.data),
   reveal: (id) => api.post(`/events/${id}/reveal`).then((r) => r.data),

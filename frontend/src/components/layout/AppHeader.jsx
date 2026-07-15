@@ -1,5 +1,5 @@
 import { Link, NavLink } from 'react-router-dom';
-import { Aperture, Images, CalendarRange, Settings, LogOut } from 'lucide-react';
+import { Aperture, Images, CalendarRange, Settings, LogOut, Crown } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 
 /**
@@ -40,6 +40,12 @@ export default function AppHeader() {
             <Images size={15} />
             Álbuns
           </NavLink>
+          {user?.role === 'admin' && (
+            <NavLink to="/admin" className={navItem}>
+              <Crown size={15} />
+              Admin
+            </NavLink>
+          )}
         </nav>
 
         {/* Ações do usuário */}

@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { Op } = require('sequelize');
 const { Event, Guest, Photo } = require('../models');
 const { EVENT_STATUS, EVENT_TYPES, FILTERS } = require('../config/constants');
@@ -61,6 +62,7 @@ async function create(req, res, next) {
     if (!plan) return res.status(400).json({ error: 'Plano invalido.' });
 
     const slug = await generateUniqueSlug(name, async (s) => !!(await Event.findOne({ where: { slug: s } })));
+    const slideshowKey = crypto.randomBytes(9).toString('hex');
 
     // Plano gratuito ja entra ativo; pago entra como rascunho ate o pagamento
     const isFree = plan.priceCents === 0;
@@ -78,6 +80,7 @@ async function create(req, res, next) {
       isPrivate: !!isPrivate,
       planId: plan.id,
       maxGuests: plan.maxGuests,
+      slideshowKey,
       isPaid: isFree,
       pricePaidCents: isFree ? 0 : 0,
       status: isFree ? EVENT_STATUS.ACTIVE : EVENT_STATUS.DRAFT,
@@ -104,6 +107,10 @@ async function getOne(req, res, next) {
   try {
     const event = await loadOwned(req, res);
     if (!event) return;
+    if (!event.slideshowKey) {
+      event.slideshowKey = crypto.randomBytes(9).toString('hex');
+      await event.save();
+    }
     const [guestCount, photoCount] = await Promise.all([
       Guest.count({ where: { eventId: event.id } }),
       Photo.count({ where: { eventId: event.id } }),
@@ -120,7 +127,8 @@ async function update(req, res, next) {
     const event = await loadOwned(req, res);
     if (!event) return;
 
-    const fields = ['name', 'type', 'startsAt', 'endsAt', 'revealAt', 'photoLimitPerGuest', 'defaultFilter', 'isPrivate'];
+    const fields = ['name', 'type', 'startsAt', 'endsAt', 'revealAt', 'photoLimitPerGuest', 'defaultFilter', 'isPrivate',
+      'liveWallEnabled', 'themeColor', 'welcomeMessage', 'coverImageUrl', 'logoUrl'];
     fields.forEach((f) => {
       if (req.body[f] !== undefined) event[f] = req.body[f];
     });
@@ -183,11 +191,19 @@ async function reveal(req, res, next) {
 }
 
 // POST /api/events/:id/publish — ativa (apos pagamento). Idempotente.
+// So ativa se o evento estiver pago (isPaid). Planos gratuitos ja nascem pagos.
+// Planos pagos nao confirmados NAO podem ser ativados por aqui (anti-bypass).
 async function publish(req, res, next) {
   try {
     const event = await loadOwned(req, res);
     if (!event) return;
     if (event.status === EVENT_STATUS.DRAFT) {
+      if (!event.isPaid) {
+        return res.status(402).json({
+          error: 'Pagamento pendente. Conclua o pagamento para ativar este evento.',
+          requiresPayment: true,
+        });
+      }
       event.status = EVENT_STATUS.ACTIVE;
       await event.save();
     }
@@ -254,6 +270,38 @@ async function destroy(req, res, next) {
   }
 }
 
+// POST /api/events/:id/branding-image?slot=cover|logo  (organizador)
+// Recebe imagem (multipart campo "image") e salva no storage; grava a URL no evento.
+async function uploadBrandingImage(req, res, next) {
+  try {
+    const event = await loadOwned(req, res);
+    if (!event) return;
+
+    const file = req.file;
+    if (!file || !file.buffer || !file.buffer.length) {
+      return res.status(400).json({ error: 'Nenhuma imagem enviada.' });
+    }
+    const slot = req.query.slot === 'logo' ? 'logo' : 'cover';
+    const storage = require('../config/storage');
+    const { url } = await storage.saveObject({
+      eventId: event.id,
+      fileName: `${slot}-${file.originalname || 'img.jpg'}`,
+      buffer: file.buffer,
+      contentType: file.mimetype || 'image/jpeg',
+      appUrl: process.env.APP_URL,
+    });
+
+    if (slot === 'logo') event.logoUrl = url;
+    else event.coverImageUrl = url;
+    await event.save();
+
+    res.json({ ok: true, slot, url, event: serialize(event) });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
-  list, create, getOne, update, close, reveal, publish, destroy, listGuests, banGuest, loadOwned, serialize,
+  list, create, getOne, update, close, reveal, publish, destroy, listGuests, banGuest,
+  uploadBrandingImage, loadOwned, serialize,
 };

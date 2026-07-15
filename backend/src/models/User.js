@@ -43,6 +43,23 @@ module.exports = (sequelize) => {
         type: DataTypes.STRING,
         allowNull: true,
       },
+      // Papel do usuario: 'user' (organizador comum) ou 'admin' (super-admin do sistema)
+      role: {
+        type: DataTypes.ENUM('user', 'admin'),
+        allowNull: false,
+        defaultValue: 'user',
+      },
+      // Conta ativa; admin pode desativar um usuario
+      isActive: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true,
+      },
+      // CPF/CNPJ (opcional) usado para gerar cobranca no Asaas
+      cpfCnpj: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
       resetPasswordToken: {
         type: DataTypes.STRING,
         allowNull: true,

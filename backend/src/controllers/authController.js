@@ -26,11 +26,16 @@ async function register(req, res, next) {
     }
 
     const passwordHash = await User.hashPassword(password);
+    // Auto-promove o primeiro admin se o email casar com ADMIN_EMAIL
+    const adminEmails = String(process.env.ADMIN_EMAIL || '')
+      .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+    const role = adminEmails.includes(normalizedEmail) ? 'admin' : 'user';
     const user = await User.create({
       name: String(name).trim(),
       email: normalizedEmail,
       passwordHash,
       provider: 'credentials',
+      role,
     });
 
     // Email de boas-vindas (mock se nao houver SMTP)

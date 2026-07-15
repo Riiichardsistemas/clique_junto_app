@@ -85,6 +85,30 @@ const storage = {
   },
 
   /**
+   * Salva um objeto (buffer) no storage e retorna { key, url } para leitura.
+   * Funciona tanto em S3 quanto local. Usado para imagens de branding.
+   */
+  async saveObject({ eventId, fileName, buffer, contentType, appUrl }) {
+    const key = buildKey(eventId, sanitizeName(fileName));
+    if (useS3) {
+      // eslint-disable-next-line global-require
+      const { PutObjectCommand } = require('@aws-sdk/client-s3');
+      await getS3().send(new PutObjectCommand({
+        Bucket: process.env.AWS_BUCKET_NAME,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+      }));
+    } else {
+      const dest = path.join(UPLOADS_DIR, key);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      await fs.promises.writeFile(dest, buffer);
+    }
+    const url = await this.getReadUrl(key, { appUrl });
+    return { key, url };
+  },
+
+  /**
    * Salva bytes localmente (usado pelo endpoint de upload local).
    */
   async saveLocal(key, buffer) {

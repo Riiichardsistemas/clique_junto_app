@@ -9,11 +9,19 @@ import AccountSettings from './pages/AccountSettings.jsx';
 import NewEvent from './pages/events/NewEvent.jsx';
 import EventDashboard from './pages/events/EventDashboard.jsx';
 import EventAlbum from './pages/events/EventAlbum.jsx';
+import Checkout from './pages/events/Checkout.jsx';
+import EventCustomize from './pages/events/EventCustomize.jsx';
 import GuestEntry from './pages/guest/GuestEntry.jsx';
 import Camera from './pages/guest/Camera.jsx';
 import Album from './pages/guest/Album.jsx';
+import Telao from './pages/telao/Telao.jsx';
 import MyAlbums from './pages/guest/MyAlbums.jsx';
 import ProtectedRoute from './components/layout/ProtectedRoute.jsx';
+import AdminRoute from './components/layout/AdminRoute.jsx';
+import AdminDashboard from './pages/admin/AdminDashboard.jsx';
+import AdminUsers from './pages/admin/AdminUsers.jsx';
+import AdminEvents from './pages/admin/AdminEvents.jsx';
+import AdminPayments from './pages/admin/AdminPayments.jsx';
 
 export default function App() {
   return (
@@ -48,10 +56,19 @@ export default function App() {
         <Route path="/events/new"       element={<ProtectedRoute><NewEvent /></ProtectedRoute>} />
         <Route path="/events/:id"       element={<ProtectedRoute><EventDashboard /></ProtectedRoute>} />
         <Route path="/events/:id/album" element={<ProtectedRoute><EventAlbum /></ProtectedRoute>} />
+        <Route path="/events/:id/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
+        <Route path="/events/:id/personalizar" element={<ProtectedRoute><EventCustomize /></ProtectedRoute>} />
         <Route path="/e/:slug"          element={<GuestEntry />} />
         <Route path="/e/:slug/camera"   element={<Camera />} />
         <Route path="/e/:slug/album"    element={<Album />} />
+        <Route path="/telao/:key"       element={<Telao />} />
         <Route path="/albuns"           element={<ProtectedRoute><MyAlbums /></ProtectedRoute>} />
+
+        {/* Painel super-admin */}
+        <Route path="/admin"          element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+        <Route path="/admin/vendas"   element={<AdminRoute><AdminPayments /></AdminRoute>} />
+        <Route path="/admin/usuarios" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+        <Route path="/admin/eventos"  element={<AdminRoute><AdminEvents /></AdminRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

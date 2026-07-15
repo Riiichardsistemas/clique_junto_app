@@ -209,4 +209,11 @@
     animation: shimmer 1.6s ease-in-out infinite;
   }
   @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+  /* Telão: efeito Ken Burns (zoom/pan lento) */
+  .ken-burns { animation: kenburns 8s ease-out both; }
+  @keyframes kenburns {
+    from { transform: scale(1) translateY(0); }
+    to   { transform: scale(1.06) translateY(-1.2%); }
+  }
 }

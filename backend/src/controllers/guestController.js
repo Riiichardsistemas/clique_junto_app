@@ -1,4 +1,6 @@
+const { Op } = require('sequelize');
 const { Event, Guest, Photo } = require('../models');
+const storage = require('../config/storage');
 const { EVENT_STATUS } = require('../config/constants');
 const { generateGuestToken } = require('../utils/generateToken');
 
@@ -19,6 +21,11 @@ function publicEvent(event) {
     isRevealed: event.isRevealed(),
     recapVideoUrl: event.isRevealed() ? event.recapVideoUrl : null,
     showBranding: event.planId === 'free',
+    // Personalização (identidade visual do evento)
+    coverImageUrl: event.coverImageUrl || null,
+    logoUrl: event.logoUrl || null,
+    themeColor: event.themeColor || null,
+    welcomeMessage: event.welcomeMessage || null,
   };
 }
 
@@ -89,4 +96,56 @@ async function me(req, res) {
   });
 }
 
-module.exports = { getEventBySlug, join, me, publicEvent };
+// GET /api/guests/slideshow/:key — dados do telão (link secreto, sem login)
+// Se liveWallEnabled: mostra fotos ao vivo. Senão, só depois da revelação.
+async function slideshow(req, res, next) {
+  try {
+    const event = await Event.findOne({ where: { slideshowKey: req.params.key } });
+    if (!event) return res.status(404).json({ error: 'Telao nao encontrado.' });
+
+    const live = !!event.liveWallEnabled;
+    const revealed = event.isRevealed();
+
+    const brand = {
+      id: event.id,
+      name: event.name,
+      type: event.type,
+      logoUrl: event.logoUrl || null,
+      coverImageUrl: event.coverImageUrl || null,
+      themeColor: event.themeColor || null,
+      showBranding: event.planId === 'free',
+    };
+
+    // Sem modo ao vivo e ainda não revelado → tela de espera
+    if (!live && !revealed) {
+      return res.json({ mode: 'waiting', event: brand, photos: [], revealAt: event.revealAt });
+    }
+
+    // Ao vivo mostra tudo; senão apenas as visíveis (reveladas)
+    const where = live ? { eventId: event.id } : { eventId: event.id, isVisible: true };
+    const limit = Math.min(Number(req.query.limit) || 80, 150);
+
+    const rows = await Photo.findAll({
+      where,
+      include: [{ model: Guest, as: 'guest', attributes: ['id', 'nickname'] }],
+      order: [['createdAt', 'DESC']],
+      limit,
+    });
+
+    const photos = await Promise.all(rows.map(async (p) => ({
+      id: p.id,
+      url: await storage.getReadUrl(p.storageKey, { appUrl: process.env.APP_URL }),
+      mediaType: p.mediaType || 'photo',
+      filter: p.filter,
+      guestNickname: p.guest ? p.guest.nickname : null,
+      createdAt: p.createdAt,
+    })));
+
+    const total = await Photo.count({ where });
+    res.json({ mode: live ? 'live' : 'revealed', event: brand, photos, total });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { getEventBySlug, join, me, publicEvent, slideshow };

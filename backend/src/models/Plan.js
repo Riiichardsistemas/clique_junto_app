@@ -14,11 +14,18 @@ module.exports = (sequelize) => {
       planId: { type: DataTypes.STRING, allowNull: false },
       amountCents: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
       provider: {
-        type: DataTypes.ENUM('mock', 'stripe', 'pagarme'),
+        type: DataTypes.ENUM('mock', 'stripe', 'pagarme', 'asaas'),
         allowNull: false,
         defaultValue: 'mock',
       },
       providerSessionId: { type: DataTypes.STRING, allowNull: true },
+      // Id da cobranca no provedor (ex.: pay_xxx no Asaas)
+      providerPaymentId: { type: DataTypes.STRING, allowNull: true },
+      // Link do checkout hospedado (Pix/boleto/cartao)
+      invoiceUrl: { type: DataTypes.STRING, allowNull: true },
+      // Metodo efetivamente usado (PIX, BOLETO, CREDIT_CARD...)
+      billingType: { type: DataTypes.STRING, allowNull: true },
+      paidAt: { type: DataTypes.DATE, allowNull: true },
       status: {
         type: DataTypes.ENUM('pending', 'paid', 'failed', 'refunded'),
         allowNull: false,

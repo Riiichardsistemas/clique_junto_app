@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Check, Heart, PartyPopper, Cake, Briefcase, Plane, Camera as CameraIcon, Aperture,
 } from 'lucide-react';
+import { paymentApi } from '../../api/paymentApi';
 import { eventApi } from '../../api/eventApi';
 import PlanSelector from '../../components/PlanSelector';
 import FilterSelector from '../../components/FilterSelector';
@@ -68,10 +69,26 @@ export default function NewEvent() {
       };
       const data = await eventApi.create(payload);
       if (data.requiresPayment) {
-        toast('Evento criado! Conclua o pagamento para ativar.', { icon: '💳' });
-      } else {
-        toast.success('Evento criado e ativado!');
+        // Plano pago: cria a cobrança e leva ao checkout
+        toast('Evento criado! Vamos ao pagamento…', { icon: '💳' });
+        try {
+          const co = await paymentApi.checkout(data.event.id, form.planId);
+          if (co.free) {
+            navigate(`/events/${data.event.id}`);
+          } else if (co.provider === 'asaas' && co.checkoutUrl) {
+            // Página de pagamento hospedada do Asaas (Pix/boleto/cartão)
+            window.location.href = co.checkoutUrl;
+          } else {
+            navigate(`/events/${data.event.id}/checkout?payment=${co.paymentId}`);
+          }
+          return;
+        } catch (e) {
+          toast.error(e?.response?.data?.error || 'Erro ao iniciar o pagamento.');
+          navigate(`/events/${data.event.id}`);
+          return;
+        }
       }
+      toast.success('Evento criado e ativado!');
       navigate(`/events/${data.event.id}`);
     } catch (err) {
       toast.error(err?.response?.data?.error || 'Erro ao criar evento.');

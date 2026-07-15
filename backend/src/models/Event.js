@@ -46,6 +46,16 @@ module.exports = (sequelize) => {
       // QR
       qrCodeUrl: { type: DataTypes.STRING, allowNull: true },
       revealEmailSent: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+      // ----- Telão ao vivo (slideshow) -----
+      // Chave secreta para o link compartilhável do telão
+      slideshowKey: { type: DataTypes.STRING, allowNull: true, unique: true },
+      // Se true, o telão exibe as fotos ao vivo (antes da revelação)
+      liveWallEnabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+      // ----- Personalização (identidade visual do evento) -----
+      coverImageUrl: { type: DataTypes.STRING, allowNull: true }, // imagem de fundo/capa
+      logoUrl: { type: DataTypes.STRING, allowNull: true },       // logo/monograma
+      themeColor: { type: DataTypes.STRING, allowNull: true },    // cor de destaque (hex)
+      welcomeMessage: { type: DataTypes.TEXT, allowNull: true },  // mensagem de boas-vindas
     },
     { tableName: 'events', timestamps: true }
   );

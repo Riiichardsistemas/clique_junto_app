@@ -2,6 +2,7 @@ const express = require('express');
 const ctrl = require('../controllers/eventController');
 const { getQRCode, getTableSign } = require('../controllers/qrController');
 const authMiddleware = require('../middlewares/authMiddleware');
+const { upload } = require('../middlewares/uploadMiddleware');
 
 const router = express.Router();
 
@@ -21,6 +22,8 @@ router.get('/:id/guests', ctrl.listGuests);
 router.post('/:id/guests/:guestId/ban', ctrl.banGuest);
 
 // QR Code
+router.post('/:id/branding-image', upload.single('image'), ctrl.uploadBrandingImage);
+
 router.get('/:id/qrcode', getQRCode); // PNG
 router.get('/:id/table-sign', getTableSign); // SVG para impressao
 

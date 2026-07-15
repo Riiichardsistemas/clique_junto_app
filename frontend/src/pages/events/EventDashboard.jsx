@@ -3,9 +3,10 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   ChevronLeft, ChevronRight, Pencil, Trash2, Rocket, Lock, Sparkles, Download,
-  Copy, QrCode, Clapperboard, X, Images,
+  Copy, QrCode, Clapperboard, X, Images, CreditCard, Palette, Monitor,
 } from 'lucide-react';
 import { eventApi } from '../../api/eventApi';
+import { paymentApi } from '../../api/paymentApi';
 import QRCodeDisplay from '../../components/QRCodeDisplay';
 
 const TYPE_LABEL = {
@@ -131,8 +132,22 @@ export default function EventDashboard() {
       const d = await eventApi.publish(event.id);
       setEvent(d.event);
       toast.success('Evento publicado!');
-    } catch { toast.error('Erro ao publicar.'); }
-    finally { setActing(false); }
+    } catch (err) {
+      if (err?.response?.status === 402) return handlePay();
+      toast.error('Erro ao publicar.');
+    } finally { setActing(false); }
+  }
+
+  async function handlePay() {
+    setActing(true);
+    try {
+      const co = await paymentApi.checkout(event.id, event.planId);
+      if (co.free) { const d = await eventApi.getOne(event.id); setEvent(d.event); return; }
+      if (co.provider === 'asaas' && co.checkoutUrl) { window.location.href = co.checkoutUrl; return; }
+      navigate(`/events/${event.id}/checkout?payment=${co.paymentId}`);
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Erro ao iniciar o pagamento.');
+    } finally { setActing(false); }
   }
 
   async function handleClose() {
@@ -283,15 +298,31 @@ export default function EventDashboard() {
             <Pencil size={14} />
             <span className="hidden sm:inline">Editar</span>
           </button>
+          <Link to={`/events/${event.id}/personalizar`} className="btn-ghost btn-sm" title="Personalizar">
+            <Palette size={14} />
+            <span className="hidden sm:inline">Personalizar</span>
+          </Link>
+          {event.slideshowKey && (
+            <a href={`/telao/${event.slideshowKey}`} target="_blank" rel="noreferrer" className="btn-ghost btn-sm" title="Abrir telão">
+              <Monitor size={14} />
+              <span className="hidden sm:inline">Telão</span>
+            </a>
+          )}
           <button onClick={handleDelete} disabled={acting}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-red-400/60 transition hover:bg-red-500/10 hover:text-red-400 disabled:opacity-40"
             title="Excluir">
             <Trash2 size={15} />
           </button>
-          {event.status === 'draft' && (
+          {event.status === 'draft' && event.isPaid && (
             <button disabled={acting} onClick={handlePublish} className="btn-primary btn-sm">
               <Rocket size={14} />
               Publicar
+            </button>
+          )}
+          {event.status === 'draft' && !event.isPaid && (
+            <button disabled={acting} onClick={handlePay} className="btn-primary btn-sm">
+              <CreditCard size={14} />
+              Pagar e ativar
             </button>
           )}
           {event.status === 'active' && (

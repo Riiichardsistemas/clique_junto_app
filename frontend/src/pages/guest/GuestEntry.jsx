@@ -4,6 +4,15 @@ import { Aperture, Users, Image as ImageIcon, ArrowRight, Camera, LayoutDashboar
 import { guestApi } from '../../api/guestApi';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 
+function hexToRgba(hex, a = 1) {
+  if (!hex) return null;
+  const m = hex.replace('#', '');
+  const n = m.length === 3 ? m.split('').map((c) => c + c).join('') : m;
+  const r = parseInt(n.slice(0, 2), 16), g = parseInt(n.slice(2, 4), 16), b = parseInt(n.slice(4, 6), 16);
+  if ([r, g, b].some(Number.isNaN)) return null;
+  return `rgba(${r},${g},${b},${a})`;
+}
+
 const TYPE_LABEL = {
   casamento: 'Casamento', festa: 'Festa', aniversario: 'Aniversário',
   corporativo: 'Corporativo', viagem: 'Viagem', outro: 'Evento',
@@ -102,8 +111,23 @@ export default function GuestEntry() {
 
   const isClosed = event?.status === 'closed' || event?.status === 'revealed';
 
+  const accent = event?.themeColor || null;
+  const cover = event?.coverImageUrl || null;
+  const logo = event?.logoUrl || null;
+  const welcome = event?.welcomeMessage || null;
+  const accentBtn = accent
+    ? { background: `linear-gradient(180deg, ${hexToRgba(accent, 1)} 0%, ${hexToRgba(accent, 0.82)} 100%)`, color: '#fff', boxShadow: `0 12px 32px -14px ${hexToRgba(accent, 0.6)}` }
+    : undefined;
+
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-ink-deep px-6 py-10">
+      {/* Capa personalizada do evento (fundo) */}
+      {cover && (
+        <div className="pointer-events-none absolute inset-0">
+          <img src={cover} alt="" className="h-full w-full object-cover opacity-40" />
+          <div className="absolute inset-0 bg-gradient-to-b from-ink-deep/70 via-ink-deep/60 to-ink-deep/85" />
+        </div>
+      )}
       {/* Glow + grid decorativos */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.25]"
@@ -118,12 +142,18 @@ export default function GuestEntry() {
 
       <div className="relative z-10 w-full max-w-sm animate-slideup">
         <div className="mb-8 flex items-center justify-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-gold/25 bg-gold/[0.08]">
-            <Aperture size={17} className="text-gold" />
-          </span>
-          <Link to="/" className="font-serif text-xl font-semibold tracking-tight text-cream">
-            Era Uma Vez
-          </Link>
+          {logo ? (
+            <img src={logo} alt={event?.name || 'logo'} className="h-14 w-14 rounded-full object-cover ring-2 ring-white/15" />
+          ) : (
+            <>
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-gold/25 bg-gold/[0.08]">
+                <Aperture size={17} className="text-gold" />
+              </span>
+              <Link to="/" className="font-serif text-xl font-semibold tracking-tight text-cream">
+                Era Uma Vez
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Organizador logado: deixa claro que esta é a tela do CONVIDADO */}
@@ -154,6 +184,9 @@ export default function GuestEntry() {
                 <span className="font-medium text-cream/80">{stats.photoCount}</span>
               </span>
             </div>
+            {welcome && (
+              <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-cream/80">{welcome}</p>
+            )}
           </div>
 
           {!isClosed && event?.endsAt && (
@@ -190,7 +223,7 @@ export default function GuestEntry() {
                 <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">{error}</p>
               )}
 
-              <button type="submit" disabled={joining}
+              <button type="submit" disabled={joining} style={accentBtn}
                 className="btn-primary w-full rounded-2xl py-3.5 disabled:opacity-50">
                 {joining ? (
                   <span className="inline-flex items-center gap-2">

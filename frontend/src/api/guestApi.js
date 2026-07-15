@@ -42,4 +42,8 @@ export const guestApi = {
     axios
       .get(`${BASE}/guests/me`, { headers: guestHeaders(slug) })
       .then((r) => r.data),
+
+  // Telão (link secreto, sem login)
+  slideshow: (key) =>
+    axios.get(`${BASE}/guests/slideshow/${key}`).then((r) => r.data),
 };
