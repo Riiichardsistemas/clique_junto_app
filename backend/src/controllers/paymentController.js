@@ -213,6 +213,140 @@ async function webhook(req, res) {
   }
 }
 
+// Carrega evento do organizador + valida plano pago. Retorna { event, plan } ou envia erro.
+async function loadPaidTarget(req, res) {
+  const { eventId, planId } = req.body;
+  const event = await Event.findOne({ where: { id: eventId, userId: req.user.id } });
+  if (!event) { res.status(404).json({ error: 'Evento nao encontrado.' }); return null; }
+  const plan = getPlan(planId || event.planId);
+  if (!plan) { res.status(400).json({ error: 'Plano invalido.' }); return null; }
+  if (plan.priceCents === 0) { res.status(400).json({ error: 'Plano gratuito nao requer pagamento.' }); return null; }
+  // Fixa o plano escolhido no evento (ainda nao pago)
+  event.planId = plan.id;
+  event.maxGuests = plan.maxGuests;
+  await event.save();
+  return { event, plan };
+}
+
+async function getOrCreatePending(event, plan, provider) {
+  let payment = await Plan.findOne({
+    where: { eventId: event.id, planId: plan.id, status: 'pending' },
+    order: [['createdAt', 'DESC']],
+  });
+  if (!payment) {
+    payment = await Plan.create({
+      eventId: event.id, planId: plan.id, amountCents: plan.priceCents, provider, status: 'pending',
+    });
+  }
+  return payment;
+}
+
+// POST /api/payments/pix (organizador) — cobrança PIX com QR Code no app
+async function pixCheckout(req, res, next) {
+  try {
+    const target = await loadPaidTarget(req, res);
+    if (!target) return;
+    const { event, plan } = target;
+    const payment = await getOrCreatePending(event, plan, asaas.useAsaas ? 'asaas' : 'mock');
+    const description = `Era Uma Vez — ${plan.label} — evento "${event.name}"`;
+
+    if (asaas.useAsaas) {
+      try {
+        const customerId = await asaas.ensureCustomer({
+          name: req.user.name, email: req.user.email, cpfCnpj: req.user.cpfCnpj || req.body.cpfCnpj,
+        });
+        const charge = await asaas.createPixCharge({
+          customerId, amountCents: plan.priceCents, description, externalReference: payment.id,
+        });
+        payment.provider = 'asaas';
+        payment.providerPaymentId = charge.id;
+        payment.invoiceUrl = charge.invoiceUrl;
+        payment.billingType = 'PIX';
+        await payment.save();
+        return res.json({ paymentId: payment.id, method: 'pix', amountCents: plan.priceCents, pix: charge.pix });
+      } catch (e) {
+        return res.status(502).json({ error: `Falha ao gerar Pix no Asaas: ${e.message}` });
+      }
+    }
+
+    // ----- MOCK: gera um QR real (payload fake) para testar a experiência -----
+    payment.billingType = 'PIX';
+    await payment.save();
+    // eslint-disable-next-line global-require
+    const QRCode = require('qrcode');
+    const payload = `00020126MOCK-PIX-${payment.id}-${plan.priceCents}5204000053039865802BR6009SAO PAULO`;
+    const dataUrl = await QRCode.toDataURL(payload, { margin: 1, width: 320 });
+    const encodedImage = dataUrl.replace(/^data:image\/png;base64,/, '');
+    return res.json({
+      paymentId: payment.id, method: 'pix', amountCents: plan.priceCents, mock: true,
+      pix: { encodedImage, payload },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// POST /api/payments/card (organizador) — cobrança no cartão (dados do cartão no corpo)
+async function cardCheckout(req, res, next) {
+  try {
+    const target = await loadPaidTarget(req, res);
+    if (!target) return;
+    const { event, plan } = target;
+    const { card, holderInfo } = req.body;
+
+    // Validação básica dos campos do cartão
+    const need = card && card.holderName && card.number && card.expiryMonth && card.expiryYear && card.ccv;
+    const needHolder = holderInfo && holderInfo.cpfCnpj && holderInfo.postalCode && holderInfo.addressNumber && holderInfo.phone;
+    if (!need || !needHolder) {
+      return res.status(400).json({ error: 'Preencha todos os dados do cartão e do titular.' });
+    }
+
+    const payment = await getOrCreatePending(event, plan, asaas.useAsaas ? 'asaas' : 'mock');
+    const description = `Era Uma Vez — ${plan.label} — evento "${event.name}"`;
+    const remoteIp = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip;
+
+    if (asaas.useAsaas) {
+      try {
+        const customerId = await asaas.ensureCustomer({
+          name: req.user.name, email: req.user.email, cpfCnpj: holderInfo.cpfCnpj,
+        });
+        const charge = await asaas.createCardCharge({
+          customerId, amountCents: plan.priceCents, description, externalReference: payment.id,
+          card,
+          holderInfo: { name: holderInfo.name || req.user.name, email: holderInfo.email || req.user.email, cpfCnpj: holderInfo.cpfCnpj, postalCode: holderInfo.postalCode, addressNumber: holderInfo.addressNumber, phone: holderInfo.phone },
+          remoteIp,
+        });
+        payment.provider = 'asaas';
+        payment.providerPaymentId = charge.id;
+        payment.billingType = 'CREDIT_CARD';
+        await payment.save();
+
+        const approved = ['CONFIRMED', 'RECEIVED'].includes(charge.status);
+        if (approved) await activatePaidEvent(event, payment, 'CREDIT_CARD');
+        return res.json({
+          paymentId: payment.id, method: 'card',
+          status: approved ? 'paid' : 'pending',
+          eventStatus: event.status,
+        });
+      } catch (e) {
+        return res.status(402).json({ error: `Pagamento recusado: ${e.message}` });
+      }
+    }
+
+    // ----- MOCK: aprova cartões que não terminam em 0000 (para testar recusa) -----
+    payment.billingType = 'CREDIT_CARD';
+    await payment.save();
+    const num = String(card.number).replace(/\s+/g, '');
+    if (num.endsWith('0000')) {
+      return res.status(402).json({ error: 'Cartão recusado (simulação). Use outro número.' });
+    }
+    await activatePaidEvent(event, payment, 'CREDIT_CARD');
+    return res.json({ paymentId: payment.id, method: 'card', status: 'paid', eventStatus: event.status, mock: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function activatePaidEvent(event, payment, billingType) {
   payment.status = 'paid';
   payment.paidAt = new Date();
@@ -234,4 +368,4 @@ async function activatePaidEvent(event, payment, billingType) {
   } catch (e) { /* ignora */ }
 }
 
-module.exports = { checkout, confirmMock, paymentStatus, webhook, activatePaidEvent };
+module.exports = { checkout, pixCheckout, cardCheckout, confirmMock, paymentStatus, webhook, activatePaidEvent };

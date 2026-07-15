@@ -138,16 +138,8 @@ export default function EventDashboard() {
     } finally { setActing(false); }
   }
 
-  async function handlePay() {
-    setActing(true);
-    try {
-      const co = await paymentApi.checkout(event.id, event.planId);
-      if (co.free) { const d = await eventApi.getOne(event.id); setEvent(d.event); return; }
-      if (co.provider === 'asaas' && co.checkoutUrl) { window.location.href = co.checkoutUrl; return; }
-      navigate(`/events/${event.id}/checkout?payment=${co.paymentId}`);
-    } catch (err) {
-      toast.error(err?.response?.data?.error || 'Erro ao iniciar o pagamento.');
-    } finally { setActing(false); }
+  function handlePay() {
+    navigate(`/events/${event.id}/checkout`);
   }
 
   async function handleClose() {

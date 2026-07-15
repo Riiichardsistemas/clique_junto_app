@@ -9,6 +9,8 @@ const router = express.Router();
 router.get('/plans', (req, res) => res.json({ plans: PLANS }));
 
 router.post('/checkout', authMiddleware, ctrl.checkout);
+router.post('/pix', authMiddleware, ctrl.pixCheckout);
+router.post('/card', authMiddleware, ctrl.cardCheckout);
 router.post('/confirm', authMiddleware, ctrl.confirmMock); // confirma mock (dev)
 router.get('/status/:paymentId', authMiddleware, ctrl.paymentStatus);
 

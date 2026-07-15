@@ -69,24 +69,10 @@ export default function NewEvent() {
       };
       const data = await eventApi.create(payload);
       if (data.requiresPayment) {
-        // Plano pago: cria a cobrança e leva ao checkout
-        toast('Evento criado! Vamos ao pagamento…', { icon: '💳' });
-        try {
-          const co = await paymentApi.checkout(data.event.id, form.planId);
-          if (co.free) {
-            navigate(`/events/${data.event.id}`);
-          } else if (co.provider === 'asaas' && co.checkoutUrl) {
-            // Página de pagamento hospedada do Asaas (Pix/boleto/cartão)
-            window.location.href = co.checkoutUrl;
-          } else {
-            navigate(`/events/${data.event.id}/checkout?payment=${co.paymentId}`);
-          }
-          return;
-        } catch (e) {
-          toast.error(e?.response?.data?.error || 'Erro ao iniciar o pagamento.');
-          navigate(`/events/${data.event.id}`);
-          return;
-        }
+        // Plano pago: leva ao checkout no app (Pix ou cartão)
+        toast('Evento criado! Escolha como pagar.', { icon: '💳' });
+        navigate(`/events/${data.event.id}/checkout`);
+        return;
       }
       toast.success('Evento criado e ativado!');
       navigate(`/events/${data.event.id}`);

@@ -90,11 +90,82 @@ async function getPayment(id) {
   return asaasFetch(`/payments/${id}`);
 }
 
+/**
+ * Cria uma cobrança PIX e retorna a cobrança + o QR Code (imagem base64 e copia-e-cola).
+ */
+async function createPixCharge({ customerId, amountCents, description, externalReference }) {
+  const dueDate = new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 10);
+  const payment = await asaasFetch('/payments', {
+    method: 'POST',
+    body: {
+      customer: customerId,
+      billingType: 'PIX',
+      value: Number((amountCents / 100).toFixed(2)),
+      dueDate,
+      description,
+      externalReference,
+    },
+  });
+  let qr = {};
+  try {
+    qr = await asaasFetch(`/payments/${payment.id}/pixQrCode`);
+  } catch (e) { qr = {}; }
+  return {
+    id: payment.id,
+    status: payment.status,
+    invoiceUrl: payment.invoiceUrl,
+    pix: {
+      encodedImage: qr.encodedImage || null, // PNG base64 (sem prefixo data:)
+      payload: qr.payload || null,           // copia-e-cola
+      expirationDate: qr.expirationDate || null,
+    },
+  };
+}
+
+/**
+ * Cria uma cobrança no CARTÃO DE CRÉDITO (cobrança imediata).
+ * card = { holderName, number, expiryMonth, expiryYear, ccv }
+ * holderInfo = { name, email, cpfCnpj, postalCode, addressNumber, phone }
+ */
+async function createCardCharge({ customerId, amountCents, description, externalReference, card, holderInfo, remoteIp }) {
+  const dueDate = new Date().toISOString().slice(0, 10);
+  const payment = await asaasFetch('/payments', {
+    method: 'POST',
+    body: {
+      customer: customerId,
+      billingType: 'CREDIT_CARD',
+      value: Number((amountCents / 100).toFixed(2)),
+      dueDate,
+      description,
+      externalReference,
+      creditCard: {
+        holderName: card.holderName,
+        number: String(card.number || '').replace(/\s+/g, ''),
+        expiryMonth: card.expiryMonth,
+        expiryYear: card.expiryYear,
+        ccv: card.ccv,
+      },
+      creditCardHolderInfo: {
+        name: holderInfo.name,
+        email: holderInfo.email,
+        cpfCnpj: holderInfo.cpfCnpj,
+        postalCode: holderInfo.postalCode,
+        addressNumber: holderInfo.addressNumber,
+        phone: holderInfo.phone,
+      },
+      remoteIp: remoteIp || undefined,
+    },
+  });
+  return { id: payment.id, status: payment.status, invoiceUrl: payment.invoiceUrl, billingType: 'CREDIT_CARD' };
+}
+
 module.exports = {
   useAsaas,
   ASAAS_ENV,
   BASE_URL,
   ensureCustomer,
   createPayment,
+  createPixCharge,
+  createCardCharge,
   getPayment,
 };
