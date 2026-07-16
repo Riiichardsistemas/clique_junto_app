@@ -24,7 +24,7 @@ async function asaasFetch(path, { method = 'GET', body } = {}) {
     headers: {
       'Content-Type': 'application/json',
       access_token: API_KEY,
-      'User-Agent': 'EraUmaVez',
+      'User-Agent': 'CliqueJunto',
     },
     body: body ? JSON.stringify(body) : undefined,
   });

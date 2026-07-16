@@ -10,7 +10,7 @@ const adminRoutes = require('./admin');
 const router = express.Router();
 
 router.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'era-uma-vez-api', time: new Date().toISOString() });
+  res.json({ status: 'ok', service: 'clique-junto-api', time: new Date().toISOString() });
 });
 
 router.use('/auth', authRoutes);

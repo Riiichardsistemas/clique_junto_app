@@ -94,7 +94,7 @@ export function AuthShell({ title, subtitle, children }) {
           <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-gold/25 bg-gold/[0.08]">
             <Aperture size={17} className="text-gold" />
           </span>
-          <span className="font-serif text-xl font-semibold tracking-tight">Era Uma Vez</span>
+          <span className="font-serif text-xl font-semibold tracking-tight">Clique Junto</span>
         </Link>
         <div className="card p-6 sm:p-8">
           <h1 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>

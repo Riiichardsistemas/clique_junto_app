@@ -39,7 +39,7 @@ async function getDimensions(buffer) {
  * Marca d'agua discreta (plano gratuito). Texto no canto inferior direito.
  * Retorna null se sharp indisponivel ou em caso de erro (segue sem marca).
  */
-async function applyWatermark(buffer, text = 'feito com Era Uma Vez') {
+async function applyWatermark(buffer, text = 'feito com Clique Junto') {
   if (!sharp) return null;
   try {
     const img = sharp(buffer).rotate();

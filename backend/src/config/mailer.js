@@ -5,11 +5,11 @@
  *   2. SMTP    — se SMTP_HOST estiver definido (nodemailer).
  *   3. Mock    — caso contrário, apenas loga no console (desenvolvimento).
  *
- * O remetente vem de MAIL_FROM (ex.: "Era Uma Vez <no-reply@seudominio.com>").
+ * O remetente vem de MAIL_FROM (ex.: "Clique Junto <no-reply@seudominio.com>").
  * No Resend, o domínio do remetente precisa estar verificado.
  */
 
-const FROM = process.env.MAIL_FROM || 'ERA UMA VEZ <no-reply@eraumavez.com>';
+const FROM = process.env.MAIL_FROM || 'CLIQUE JUNTO <no-reply@cliquejunto.com>';
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const hasSmtp = !!process.env.SMTP_HOST;
 const hasResend = !!RESEND_API_KEY;

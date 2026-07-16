@@ -72,7 +72,7 @@ async function checkout(req, res, next) {
         const charge = await asaas.createPayment({
           customerId,
           amountCents: plan.priceCents,
-          description: `Era Uma Vez — ${plan.label} — evento "${event.name}"`,
+          description: `Clique Junto — ${plan.label} — evento "${event.name}"`,
           externalReference: payment.id,
         });
 
@@ -248,7 +248,7 @@ async function pixCheckout(req, res, next) {
     if (!target) return;
     const { event, plan } = target;
     const payment = await getOrCreatePending(event, plan, asaas.useAsaas ? 'asaas' : 'mock');
-    const description = `Era Uma Vez — ${plan.label} — evento "${event.name}"`;
+    const description = `Clique Junto — ${plan.label} — evento "${event.name}"`;
 
     if (asaas.useAsaas) {
       try {
@@ -302,7 +302,7 @@ async function cardCheckout(req, res, next) {
     }
 
     const payment = await getOrCreatePending(event, plan, asaas.useAsaas ? 'asaas' : 'mock');
-    const description = `Era Uma Vez — ${plan.label} — evento "${event.name}"`;
+    const description = `Clique Junto — ${plan.label} — evento "${event.name}"`;
     const remoteIp = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip;
 
     if (asaas.useAsaas) {

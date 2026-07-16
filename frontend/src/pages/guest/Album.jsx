@@ -30,7 +30,7 @@ function GrowthCTA({ slug }) {
         className="btn-primary mt-4 inline-block rounded-2xl px-8 py-3 text-sm">
         Criar meu evento grátis
       </Link>
-      <p className="label-mono mt-3 text-cream/25">feito com Era Uma Vez</p>
+      <p className="label-mono mt-3 text-cream/25">feito com Clique Junto</p>
     </div>
   );
 }

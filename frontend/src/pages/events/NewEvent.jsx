@@ -96,7 +96,7 @@ export default function NewEvent() {
           </button>
           <span className="flex items-center gap-2 font-serif text-base font-semibold tracking-tight">
             <Aperture size={15} className="text-gold" />
-            Era Uma Vez
+            Clique Junto
           </span>
           <span className="w-16" />
         </div>

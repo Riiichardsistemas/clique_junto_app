@@ -1,4 +1,4 @@
-# 🚀 Guia de Deploy — Era Uma Vez
+# 🚀 Guia de Deploy — Clique Junto
 
 Backend no **Railway** (Node + Postgres) e frontend no **Vercel**.
 
@@ -36,7 +36,7 @@ Ordem recomendada: **1) Backend no Railway → 2) Frontend no Vercel → 3) Ajus
 | `ASAAS_WEBHOOK_TOKEN` | um token aleatório à sua escolha |
 | `AWS_*` | credenciais do S3 (ver seção 4) |
 | `RESEND_API_KEY` | chave do Resend (ver seção 5) |
-| `MAIL_FROM` | `Era Uma Vez <no-reply@seudominio.com>` |
+| `MAIL_FROM` | `Clique Junto <no-reply@seudominio.com>` |
 
 **Gerar segredos fortes:**
 ```bash
@@ -58,7 +58,7 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 |---|---|
 | `VITE_API_URL` | `https://SEU-BACKEND.up.railway.app/api` |
 
-4. Deploy. Anote a URL final (ex.: `https://era-uma-vez.vercel.app`).
+4. Deploy. Anote a URL final (ex.: `https://clique-junto.vercel.app`).
 
 ---
 
@@ -73,7 +73,7 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 
 O disco do Railway é **efêmero**: sem S3, as fotos somem a cada deploy. Configure um bucket S3:
 
-1. Crie um bucket na AWS (ex.: `era-uma-vez-fotos`), região ex. `sa-east-1`.
+1. Crie um bucket na AWS (ex.: `clique-junto-fotos`), região ex. `sa-east-1`.
 2. Crie um usuário IAM com permissão de leitura/escrita nesse bucket e gere chaves.
 3. No Railway, defina `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_BUCKET_NAME`.
 4. Com `AWS_BUCKET_NAME` preenchido, a API passa a usar S3 com URLs assinadas automaticamente.

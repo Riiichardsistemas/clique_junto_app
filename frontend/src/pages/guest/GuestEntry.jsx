@@ -150,7 +150,7 @@ export default function GuestEntry() {
                 <Aperture size={17} className="text-gold" />
               </span>
               <Link to="/" className="font-serif text-xl font-semibold tracking-tight text-cream">
-                Era Uma Vez
+                Clique Junto
               </Link>
             </>
           )}

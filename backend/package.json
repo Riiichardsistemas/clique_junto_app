@@ -1,7 +1,7 @@
 {
-  "name": "era-uma-vez-backend",
+  "name": "clique-junto-backend",
   "version": "1.0.0",
-  "description": "Backend da plataforma ERA UMA VEZ - album colaborativo de fotos para eventos",
+  "description": "Backend da plataforma CLIQUE JUNTO - album colaborativo de fotos para eventos",
   "main": "src/app.js",
   "type": "commonjs",
   "scripts": {

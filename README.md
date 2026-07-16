@@ -1,4 +1,4 @@
-# ERA UMA VEZ — Álbum colaborativo de fotos
+# CLIQUE JUNTO — Álbum colaborativo de fotos
 
 Plataforma web onde o organizador cria um evento, gera um QR Code, e os convidados
 fotografam pelo navegador. As fotos ficam bloqueadas até a data de revelação — como

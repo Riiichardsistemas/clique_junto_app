@@ -26,7 +26,7 @@ export default function AppHeader() {
             <Aperture size={15} className="text-gold" />
           </span>
           <span className="hidden font-serif text-base font-semibold tracking-tight sm:inline">
-            Era Uma Vez
+            Clique Junto
           </span>
         </Link>
 

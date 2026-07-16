@@ -8,7 +8,7 @@ const wrap = (inner) => `
     </div>
     <div style="padding:28px">${inner}</div>
     <div style="padding:18px 28px;border-top:1px solid #2a2a2a;color:#777;font-size:12px">
-      Voce recebeu este email porque usa a plataforma ERA UMA VEZ.
+      Voce recebeu este email porque usa a plataforma CLIQUE JUNTO.
     </div>
   </div>
 </div>`;
@@ -17,7 +17,7 @@ const btn = (href, label) =>
   `<a href="${href}" style="display:inline-block;background:#d4a853;color:#0a0a0a;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:10px;margin-top:8px">${label}</a>`;
 
 const welcome = (name) => ({
-  subject: 'Bem-vindo ao ERA UMA VEZ ✨',
+  subject: 'Bem-vindo ao CLIQUE JUNTO ✨',
   html: wrap(`<h2 style="font-family:Georgia,serif;margin-top:0">Ola, ${name}!</h2>
     <p style="color:#cfcfcf">Sua conta foi criada. Agora voce ja pode criar seu primeiro evento e guardar memorias inesqueciveis.</p>`),
 });
@@ -58,7 +58,7 @@ const guestAlbumReady = (nickname, eventName, albumUrl) => ({
 });
 
 const forgotPassword = (name, resetUrl) => ({
-  subject: 'Redefinir senha — Era Uma Vez',
+  subject: 'Redefinir senha — Clique Junto',
   html: wrap(`<h2 style="font-family:Georgia,serif;margin-top:0">Olá, ${name}!</h2>
     <p style="color:#cfcfcf">Recebemos uma solicitação para redefinir a senha da sua conta. Clique no botão abaixo (válido por 1 hora).</p>
     <p>${btn(resetUrl, 'Redefinir senha')}</p>

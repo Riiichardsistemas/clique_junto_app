@@ -153,7 +153,7 @@ export default function Telao() {
       <footer className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-between px-8 py-5 text-sm text-cream-dim">
         <span>{data.total ? `${data.total} momento(s)` : ''}</span>
         {isNew && <span className="animate-fadein font-medium" style={{ color: accent }}>✦ nova foto</span>}
-        {event?.showBranding ? <span className="font-serif">Era Uma Vez</span> : <span />}
+        {event?.showBranding ? <span className="font-serif">Clique Junto</span> : <span />}
       </footer>
     </div>
   );
