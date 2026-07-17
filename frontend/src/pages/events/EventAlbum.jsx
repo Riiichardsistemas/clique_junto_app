@@ -242,8 +242,8 @@ export default function EventAlbum() {
             <ChevronRight size={19} />
           </button>
 
-          <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-full border border-white/10 bg-black/60 px-4 py-2 backdrop-blur-md">
-            <p className="film-counter">
+          <div className="absolute bottom-5 left-1/2 flex w-max max-w-[92vw] -translate-x-1/2 items-center gap-3 rounded-full border border-white/10 bg-black/60 px-4 py-2 backdrop-blur-md">
+            <p className="film-counter truncate">
               {selected + 1} / {photos.length}
               {photos[selected]?.guestNickname && (
                 <span className="text-white/50"> · por {photos[selected].guestNickname}</span>

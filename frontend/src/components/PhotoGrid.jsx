@@ -22,7 +22,7 @@ export default function PhotoGrid({ photos, onRemove }) {
             />
             {/* Badge do convidado */}
             {photo.guestNickname && (
-              <div className="pointer-events-none absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-2.5 pb-2 pt-6 opacity-0 transition-opacity group-hover:opacity-100">
+              <div className="pointer-events-none absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-2.5 pb-2 pt-6 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
                 <p className="truncate text-xs text-cream/90">{photo.guestNickname}</p>
               </div>
             )}
@@ -30,7 +30,7 @@ export default function PhotoGrid({ photos, onRemove }) {
             {onRemove && (
               <button
                 onClick={() => onRemove(photo.id)}
-                className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white/70 opacity-0 backdrop-blur-sm transition group-hover:opacity-100 hover:bg-red-600 hover:text-white"
+                className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white/70 backdrop-blur-sm transition hover:bg-red-600 hover:text-white sm:opacity-0 sm:group-hover:opacity-100"
                 title="Remover foto"
               >
                 <X size={13} />

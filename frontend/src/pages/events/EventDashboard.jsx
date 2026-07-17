@@ -270,7 +270,7 @@ export default function EventDashboard() {
   return (
     <div className="min-h-screen text-cream">
       <header className="glass sticky top-0 z-10">
-        <div className="mx-auto flex max-w-3xl items-center gap-1.5 px-4 py-2.5 sm:px-6">
+        <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-x-1.5 gap-y-1 px-4 py-2.5 sm:px-6">
           <Link to="/dashboard" className="inline-flex items-center gap-1 text-sm text-cream-dim transition hover:text-cream">
             <ChevronLeft size={16} />
             Eventos
@@ -511,12 +511,12 @@ export default function EventDashboard() {
                       {/* Botão deletar — aparece no hover */}
                       <button
                         onClick={() => handleDeletePhoto(p.id)}
-                        className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-ink/70 text-cream/60 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:text-red-400"
+                        className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-ink/70 text-cream/60 backdrop-blur-sm transition-opacity hover:text-red-400 sm:opacity-0 sm:group-hover:opacity-100"
                         title="Remover foto">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
                       </button>
                       {p.guestNickname && (
-                        <span className="pointer-events-none absolute bottom-0 left-0 right-0 bg-gradient-to-t from-ink/80 to-transparent px-2 pb-1.5 pt-4 text-left text-[11px] text-cream/70 opacity-0 transition-opacity group-hover:opacity-100">
+                        <span className="pointer-events-none absolute bottom-0 left-0 right-0 bg-gradient-to-t from-ink/80 to-transparent px-2 pb-1.5 pt-4 text-left text-[11px] text-cream/70 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
                           {p.guestNickname}
                         </span>
                       )}
@@ -602,7 +602,7 @@ export default function EventDashboard() {
         <div className="fixed inset-0 z-50 flex animate-fadein items-center justify-center bg-black/80 px-4 backdrop-blur-md"
           onClick={() => setEditOpen(false)}>
           <form onSubmit={handleSaveEdit}
-            className="w-full max-w-md animate-scalein rounded-glass border border-line bg-ink p-6 shadow-2xl"
+            className="max-h-[90vh] w-full max-w-md animate-scalein overflow-y-auto rounded-glass border border-line bg-ink p-5 shadow-2xl sm:p-6"
             onClick={(e) => e.stopPropagation()}>
             <div className="mb-5 flex items-center justify-between">
               <h2 className="font-serif text-xl font-semibold tracking-tight">Editar evento</h2>
@@ -631,7 +631,7 @@ export default function EventDashboard() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label className="label-mono mb-1.5 block text-cream/40">Início</label>
                   <input type="datetime-local" className="input-field text-sm" value={editForm.startsAt}

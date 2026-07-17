@@ -26,6 +26,9 @@ function publicEvent(event) {
     logoUrl: event.logoUrl || null,
     themeColor: event.themeColor || null,
     welcomeMessage: event.welcomeMessage || null,
+    entryTemplate: event.entryTemplate || 'classic',
+    venueName: event.venueName || null,
+    invitePhotos: [event.invitePhoto1Url, event.invitePhoto2Url, event.invitePhoto3Url].filter(Boolean),
   };
 }
 

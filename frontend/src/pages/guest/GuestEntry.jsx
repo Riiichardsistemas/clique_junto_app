@@ -64,6 +64,176 @@ function Countdown({ target }) {
   );
 }
 
+/* ---------- Tema “Convite” — página clara com polaroids ---------- */
+function ConviteEntry({
+  event, stats, slug, isClosed, isAuthenticated,
+  nickname, setNickname, email, setEmail, error, joining, handleJoin,
+}) {
+  const accent = event?.themeColor || '#D2622A';
+  const photos = (event?.invitePhotos?.length ? event.invitePhotos : [event?.coverImageUrl]).filter(Boolean);
+  const dateLabel = event?.startsAt
+    ? new Date(event.startsAt).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })
+    : null;
+  const caption = event?.welcomeMessage || 'a festa toda, num filme só';
+  const guestCount = stats?.guestCount ?? 0;
+  const ink = '#2b241a';
+
+  return (
+    <div className="flex min-h-screen flex-col items-center overflow-x-hidden bg-[#f2ead9] px-5 py-8 sm:py-12" style={{ color: ink }}>
+      <div className="w-full max-w-sm animate-slideup text-center">
+        {/* Marca */}
+        <p className="font-serif text-lg italic" style={{ color: `${ink}B3` }}>
+          Clique Junto<span style={{ color: accent }}>.</span>
+        </p>
+
+        {/* Pilha de polaroids — leque orgânico; com 3 fotos a principal centraliza
+            e encolhe para as duas de trás espreitarem pelos cantos */}
+        <div className="relative mt-4">
+          {/* Fundo direita — paisagem, mais alta, inclinada pra direita */}
+          {photos[1] && (
+            <div className={`absolute top-0 z-[1] rotate-[7deg] rounded-sm bg-white p-1.5 pb-4 shadow-[0_12px_32px_-14px_rgba(43,36,26,0.5)] ${
+              photos[2] ? '-right-[1%] w-[56%]' : '-right-[2%] w-[60%]'}`}>
+              <img src={photos[1]} alt="" className="aspect-[5/4] w-full rounded-[2px] object-cover" />
+            </div>
+          )}
+          {/* Fundo esquerda — um degrau abaixo, inclinada pra esquerda */}
+          {photos[2] && (
+            <div className="absolute -left-[2%] top-7 z-0 w-[52%] rotate-[-10deg] rounded-sm bg-white p-1.5 pb-4 shadow-[0_10px_28px_-14px_rgba(43,36,26,0.45)]">
+              <img src={photos[2]} alt="" className="aspect-[5/4] w-full rounded-[2px] object-cover" />
+            </div>
+          )}
+          {/* Principal — contrapõe o ângulo das de fundo */}
+          <div className={`relative z-10 rounded-sm bg-white p-2.5 pb-3 shadow-[0_18px_44px_-16px_rgba(43,36,26,0.55)] ${
+            photos[2]
+              ? 'mx-auto mt-[4.75rem] w-[74%] rotate-[-2.5deg]'
+              : photos[1]
+                ? 'ml-[1%] mt-16 w-[84%] rotate-[-2deg]'
+                : 'mx-auto mt-2 w-[84%] rotate-[-1.5deg]'}`}>
+            <span className="relative block">
+              {photos[0] ? (
+                <img src={photos[0]} alt={event?.name} className="aspect-[4/5] w-full rounded-[2px] object-cover" />
+              ) : (
+                <span className="flex aspect-[4/5] w-full items-center justify-center rounded-[2px] bg-[#e5dcc8]">
+                  <Aperture size={28} style={{ color: `${ink}4D` }} />
+                </span>
+              )}
+              {/* Selo preso ao canto da foto — não depende do tamanho da legenda */}
+              <span
+                className="absolute -right-5 bottom-3 z-20 rotate-[-4deg] rounded-sm px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white shadow-lg"
+                style={{ background: accent }}>
+                Convite ★
+              </span>
+            </span>
+            <p className="mt-2.5 line-clamp-3 px-1 text-center font-serif text-sm italic leading-snug" style={{ color: `${ink}99` }}>
+              {caption}
+            </p>
+          </div>
+        </div>
+
+        {/* Convite — alinhado à esquerda, como no layout */}
+        <div className="mt-8 text-left">
+          <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.3em]" style={{ color: accent }}>
+            Você foi convidado para
+          </p>
+          <h1 className="mt-1.5 break-words font-serif text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
+            {event?.name}
+          </h1>
+          {(dateLabel || event?.venueName) && (
+            <p className="mt-1.5 text-sm font-medium" style={{ color: `${ink}99` }}>
+              {[dateLabel, event?.venueName].filter(Boolean).join(' · ')}
+            </p>
+          )}
+        </div>
+
+        {isClosed ? (
+          <div className="mt-8">
+            <p className="mb-4 text-sm" style={{ color: `${ink}99` }}>Este evento está encerrado.</p>
+            <Link to={`/e/${slug}/album`}
+              className="flex w-full items-center justify-center gap-2 rounded-xl py-4 text-sm font-semibold text-[#f2ead9] transition hover:opacity-90"
+              style={{ background: ink }}>
+              Ver álbum <ArrowRight size={15} />
+            </Link>
+          </div>
+        ) : (
+          <form onSubmit={handleJoin} className="mt-8 text-left">
+            <label className="mb-2 block font-mono text-[10px] font-semibold uppercase tracking-[0.25em]" style={{ color: `${ink}80` }}>
+              Seu nome
+            </label>
+            <input
+              type="text" value={nickname} onChange={(e) => setNickname(e.target.value)}
+              placeholder="Como te chamam na festa?" maxLength={40}
+              className="w-full rounded-xl border bg-white/70 px-4 py-3.5 text-[15px] outline-none transition placeholder:text-[#2b241a]/35 focus:bg-white"
+              style={{ borderColor: `${ink}26`, color: ink }}
+            />
+
+            <label className="mb-2 mt-4 block font-mono text-[10px] font-semibold uppercase tracking-[0.25em]" style={{ color: `${ink}80` }}>
+              Email <span className="normal-case tracking-normal" style={{ color: `${ink}59` }}>(opcional, para avisar da revelação)</span>
+            </label>
+            <input
+              type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+              placeholder="voce@email.com"
+              className="w-full rounded-xl border bg-white/70 px-4 py-3.5 text-[15px] outline-none transition placeholder:text-[#2b241a]/35 focus:bg-white"
+              style={{ borderColor: `${ink}26`, color: ink }}
+            />
+
+            {error && (
+              <p className="mt-3 rounded-xl px-4 py-2.5 text-sm" style={{ background: `${accent}1A`, color: accent }}>{error}</p>
+            )}
+
+            <button type="submit" disabled={joining}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl py-4 text-sm font-semibold text-[#f2ead9] transition hover:opacity-90 disabled:opacity-60"
+              style={{ background: ink }}>
+              {joining ? (
+                <>
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#f2ead9]/30 border-t-[#f2ead9]" />
+                  Entrando…
+                </>
+              ) : (
+                <>Entrar no filme <ArrowRight size={15} /></>
+              )}
+            </button>
+          </form>
+        )}
+
+        {/* Prova social */}
+        {guestCount > 0 && (
+          <div className="mt-6 flex items-center justify-center gap-2.5">
+            <span className="flex -space-x-2">
+              {Array.from({ length: Math.min(3, guestCount) }).map((_, i) => (
+                <span key={i}
+                  className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-[#f2ead9] font-serif text-[10px] text-white"
+                  style={{ background: [accent, ink, '#7EA4A0'][i] }}>
+                  <Camera size={10} />
+                </span>
+              ))}
+            </span>
+            <span className="text-xs font-medium" style={{ color: `${ink}99` }}>
+              +{guestCount} {guestCount === 1 ? 'pessoa já entrou' : 'pessoas já entraram'}
+            </span>
+          </div>
+        )}
+
+        {!isClosed && (
+          <Link to={`/e/${slug}/album`}
+            className="mt-4 inline-flex items-center gap-1 text-sm font-medium underline-offset-4 transition hover:underline"
+            style={{ color: `${ink}99` }}>
+            Ver álbum <ArrowRight size={13} />
+          </Link>
+        )}
+
+        {isAuthenticated && (
+          <p className="mt-5">
+            <Link to="/dashboard" className="inline-flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] underline-offset-4 hover:underline"
+              style={{ color: accent }}>
+              <LayoutDashboard size={11} /> Ver como organizador →
+            </Link>
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function GuestEntry() {
   const { slug } = useParams();
   const navigate = useNavigate();
@@ -111,6 +281,18 @@ export default function GuestEntry() {
 
   const isClosed = event?.status === 'closed' || event?.status === 'revealed';
 
+  if (event?.entryTemplate === 'convite') {
+    return (
+      <ConviteEntry
+        event={event} stats={stats} slug={slug} isClosed={isClosed}
+        isAuthenticated={isAuthenticated}
+        nickname={nickname} setNickname={setNickname}
+        email={email} setEmail={setEmail}
+        error={error} joining={joining} handleJoin={handleJoin}
+      />
+    );
+  }
+
   const accent = event?.themeColor || null;
   const cover = event?.coverImageUrl || null;
   const logo = event?.logoUrl || null;
@@ -120,7 +302,7 @@ export default function GuestEntry() {
     : undefined;
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-ink-deep px-6 py-10">
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-ink-deep px-4 py-8 sm:px-6 sm:py-10">
       {/* Capa personalizada do evento (fundo) */}
       {cover && (
         <div className="pointer-events-none absolute inset-0">
@@ -169,10 +351,10 @@ export default function GuestEntry() {
           </div>
         )}
 
-        <div className="card p-8">
+        <div className="card p-6 sm:p-8">
           <div className="mb-7 text-center">
             <p className="label-mono mb-3">{TYPE_LABEL[event?.type] || 'Evento'}</p>
-            <h1 className="font-serif text-4xl font-semibold leading-tight tracking-tight text-cream">{event?.name}</h1>
+            <h1 className="break-words font-serif text-3xl font-semibold leading-tight tracking-tight text-cream sm:text-4xl">{event?.name}</h1>
             <div className="mt-4 flex items-center justify-center gap-4 text-sm text-cream-dim">
               <span className="inline-flex items-center gap-1.5">
                 <Users size={14} className="text-gold/50" />

@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Check, Heart, PartyPopper, Cake, Briefcase, Plane, Camera as CameraIcon, Aperture,
+  Palette, MessageSquare, UploadCloud, X, MapPin,
 } from 'lucide-react';
-import { paymentApi } from '../../api/paymentApi';
 import { eventApi } from '../../api/eventApi';
 import PlanSelector from '../../components/PlanSelector';
 import FilterSelector from '../../components/FilterSelector';
@@ -31,7 +31,9 @@ const PHOTO_LIMITS = [
   { value: 0, label: 'Ilimitado' },
 ];
 
-const STEPS = ['Informações', 'Configurações', 'Plano', 'Confirmar'];
+const PRESET_COLORS = ['#C4A96C', '#E8B4B8', '#7EA4A0', '#8E7CC3', '#D98C5F', '#5B7DB1', '#B5654A', '#3F4A3C'];
+
+const STEPS = ['Informações', 'Configurações', 'Personalização', 'Plano', 'Confirmar'];
 
 const defaultForm = {
   name: '',
@@ -42,6 +44,10 @@ const defaultForm = {
   photoLimitPerGuest: 10,
   defaultFilter: 'nenhum',
   planId: 'free',
+  themeColor: '#C4A96C',
+  welcomeMessage: '',
+  entryTemplate: 'classic',
+  venueName: '',
 };
 
 const stepAnim = {
@@ -53,10 +59,34 @@ const stepAnim = {
 export default function NewEvent() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState(defaultForm);
+  const [coverFile, setCoverFile] = useState(null);
+  const [logoFile, setLogoFile] = useState(null);
+  const [inviteFiles, setInviteFiles] = useState([null, null, null]);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  const coverInput = useRef(null);
+  const logoInput = useRef(null);
+  const inviteInput0 = useRef(null);
+  const inviteInput1 = useRef(null);
+  const inviteInput2 = useRef(null);
+  const inviteInputs = [inviteInput0, inviteInput1, inviteInput2];
+
+  const setInviteFile = (i, file) =>
+    setInviteFiles((fs) => fs.map((f, j) => (j === i ? file : f)));
+
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
+
+  // Previews locais das imagens escolhidas
+  const coverPreview = useMemo(() => (coverFile ? URL.createObjectURL(coverFile) : null), [coverFile]);
+  const logoPreview = useMemo(() => (logoFile ? URL.createObjectURL(logoFile) : null), [logoFile]);
+  useEffect(() => () => { if (coverPreview) URL.revokeObjectURL(coverPreview); }, [coverPreview]);
+  useEffect(() => () => { if (logoPreview) URL.revokeObjectURL(logoPreview); }, [logoPreview]);
+  const invitePreviews = useMemo(
+    () => inviteFiles.map((f) => (f ? URL.createObjectURL(f) : null)),
+    [inviteFiles]
+  );
+  useEffect(() => () => { invitePreviews.forEach((u) => u && URL.revokeObjectURL(u)); }, [invitePreviews]);
 
   async function submit() {
     setLoading(true);
@@ -66,16 +96,37 @@ export default function NewEvent() {
         startsAt: form.startsAt || null,
         endsAt: form.endsAt || null,
         revealAt: form.revealAt || form.endsAt || null,
+        welcomeMessage: form.welcomeMessage.trim() || null,
+        venueName: form.venueName.trim() || null,
       };
       const data = await eventApi.create(payload);
+      const eventId = data.event.id;
+
+      // Envia imagens escolhidas no fluxo (não bloqueia a criação se falhar)
+      const uploads = [];
+      if (form.entryTemplate === 'convite') {
+        inviteFiles.forEach((f, i) => {
+          if (f) uploads.push(eventApi.uploadBrandingImage(eventId, `invite${i + 1}`, f));
+        });
+      } else {
+        if (coverFile) uploads.push(eventApi.uploadBrandingImage(eventId, 'cover', coverFile));
+        if (logoFile) uploads.push(eventApi.uploadBrandingImage(eventId, 'logo', logoFile));
+      }
+      if (uploads.length) {
+        const results = await Promise.allSettled(uploads);
+        if (results.some((r) => r.status === 'rejected')) {
+          toast('Evento criado, mas uma imagem não subiu. Você pode reenviar em Personalizar.', { icon: '⚠️' });
+        }
+      }
+
       if (data.requiresPayment) {
         // Plano pago: leva ao checkout no app (Pix ou cartão)
         toast('Evento criado! Escolha como pagar.', { icon: '💳' });
-        navigate(`/events/${data.event.id}/checkout`);
+        navigate(`/events/${eventId}/checkout`);
         return;
       }
       toast.success('Evento criado e ativado!');
-      navigate(`/events/${data.event.id}`);
+      navigate(`/events/${eventId}`);
     } catch (err) {
       toast.error(err?.response?.data?.error || 'Erro ao criar evento.');
     } finally {
@@ -105,12 +156,15 @@ export default function NewEvent() {
       <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-10">
         {/* Progresso — steps segmentados */}
         <div className="mb-8 sm:mb-12">
+          <p className="mb-3 font-mono text-[10px] uppercase tracking-wider text-cream-dim/60">
+            Etapa {step + 1} de {STEPS.length}
+          </p>
           <div className="flex items-center gap-2">
             {STEPS.map((s, i) => (
               <div key={s} className="flex flex-1 flex-col gap-2">
                 <div className={`h-1 rounded-full transition-all duration-300 ${
                   i < step ? 'bg-gold/60' : i === step ? 'bg-gold' : 'bg-white/10'}`} />
-                <span className={`flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider transition-colors ${
+                <span className={`hidden items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider transition-colors sm:flex ${
                   i <= step ? 'text-cream/85' : 'text-cream-dim/50'}`}>
                   {i < step && <Check size={10} strokeWidth={3} className="text-emerald-400" />}
                   {s}
@@ -118,10 +172,11 @@ export default function NewEvent() {
               </div>
             ))}
           </div>
+          <p className="mt-2 font-mono text-[10px] uppercase tracking-wider text-cream/85 sm:hidden">{STEPS[step]}</p>
         </div>
 
         <AnimatePresence mode="wait">
-          {/* Passo 1 */}
+          {/* Passo 1 — Informações */}
           {step === 0 && (
             <motion.div key="s0" {...stepAnim} className="space-y-8">
               <div>
@@ -148,7 +203,7 @@ export default function NewEvent() {
             </motion.div>
           )}
 
-          {/* Passo 2 */}
+          {/* Passo 2 — Configurações */}
           {step === 1 && (
             <motion.div key="s1" {...stepAnim} className="space-y-6">
               <div>
@@ -194,9 +249,190 @@ export default function NewEvent() {
             </motion.div>
           )}
 
-          {/* Passo 3 */}
+          {/* Passo 3 — Personalização */}
           {step === 2 && (
-            <motion.div key="s2" {...stepAnim} className="space-y-8">
+            <motion.div key="s2" {...stepAnim} className="space-y-6">
+              <div>
+                <h1 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl">Deixe com a sua cara</h1>
+                <p className="mt-2 text-sm text-cream-dim">
+                  Opcional — tudo aqui pode ser ajustado depois em <span className="text-cream">Personalizar</span>, na página do evento.
+                </p>
+              </div>
+
+              {/* Modelo da página de entrada */}
+              <div>
+                <p className="mb-2 text-sm font-medium text-cream-dim">Modelo da página de entrada</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => set('entryTemplate', 'classic')}
+                    className={`overflow-hidden rounded-xl border-2 text-left transition ${form.entryTemplate === 'classic' ? 'border-gold' : 'border-line hover:border-gold/40'}`}>
+                    <div className="flex h-24 flex-col items-center justify-center gap-1.5 bg-[#14110b] sm:h-28">
+                      <span className="h-1.5 w-12 rounded-full bg-white/20" />
+                      <span className="h-2.5 w-20 rounded-full bg-white/40" />
+                      <span className="mt-1 h-5 w-24 rounded-lg border border-white/10 bg-white/[0.06]" />
+                      <span className="h-4 w-24 rounded-lg" style={{ background: form.themeColor }} />
+                    </div>
+                    <p className="px-3 py-2 text-xs font-medium text-cream">Clássico <span className="font-normal text-cream-dim">— escuro</span></p>
+                  </button>
+                  <button onClick={() => set('entryTemplate', 'convite')}
+                    className={`overflow-hidden rounded-xl border-2 text-left transition ${form.entryTemplate === 'convite' ? 'border-gold' : 'border-line hover:border-gold/40'}`}>
+                    <div className="relative flex h-24 flex-col items-center justify-center gap-1.5 bg-[#f2ead9] sm:h-28">
+                      <span className="absolute left-1/2 top-2 h-9 w-8 -translate-x-[62%] -rotate-6 rounded-sm bg-white shadow-md" />
+                      <span className="absolute left-1/2 top-3 h-9 w-8 -translate-x-[30%] rotate-3 rounded-sm bg-white shadow-md" />
+                      <span className="absolute left-1/2 top-9 -translate-x-[10%] rotate-6 rounded-sm px-1.5 py-0.5 text-[6px] font-bold uppercase tracking-wider text-white" style={{ background: form.themeColor }}>convite ★</span>
+                      <span className="mt-10 h-2 w-16 rounded-full bg-[#2b241a]/70" />
+                      <span className="h-4 w-24 rounded-lg bg-[#2b241a]" />
+                    </div>
+                    <p className="px-3 py-2 text-xs font-medium text-cream">Convite <span className="font-normal text-cream-dim">— polaroids</span></p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Preview ao vivo da página do convidado */}
+              <div>
+                <p className="label-mono mb-2 text-cream-dim/70">Prévia da página do convidado</p>
+                {form.entryTemplate === 'convite' ? (
+                  <div className="overflow-hidden rounded-2xl border border-line bg-[#f2ead9] px-4 pb-6 pt-4 text-center text-[#2b241a]">
+                    <p className="font-serif text-xs italic text-[#2b241a]/70">Clique Junto</p>
+                    <div className="relative mx-auto mt-2 h-28 w-36">
+                      {invitePreviews[1] && (
+                        <span className="absolute left-1/2 top-1 h-24 w-20 -translate-x-[80%] -rotate-6 overflow-hidden rounded-sm bg-white p-1 shadow-md">
+                          <img src={invitePreviews[1]} alt="" className="h-full w-full object-cover" />
+                        </span>
+                      )}
+                      <span className="absolute left-1/2 top-0 h-[6.5rem] w-24 -translate-x-[35%] rotate-3 overflow-hidden rounded-sm bg-white p-1 shadow-lg">
+                        {invitePreviews[0]
+                          ? <img src={invitePreviews[0]} alt="" className="h-full w-full object-cover" />
+                          : <span className="flex h-full w-full items-center justify-center bg-[#e5dcc8]"><CameraIcon size={16} className="text-[#2b241a]/30" /></span>}
+                      </span>
+                      <span className="absolute bottom-0 left-1/2 translate-x-[15%] rotate-6 rounded-sm px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-wider text-white shadow" style={{ background: form.themeColor }}>
+                        convite ★
+                      </span>
+                    </div>
+                    <p className="mt-2.5 font-mono text-[8px] font-semibold uppercase tracking-[0.2em]" style={{ color: form.themeColor }}>Você foi convidado para</p>
+                    <p className="font-serif text-xl font-semibold leading-tight">{form.name || 'Nome do evento'}</p>
+                    <p className="mt-0.5 text-[11px] text-[#2b241a]/60">
+                      {[
+                        form.startsAt ? new Date(form.startsAt).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' }) : null,
+                        form.venueName.trim() || null,
+                      ].filter(Boolean).join(' · ') || 'data · local'}
+                    </p>
+                    <span className="mt-3 inline-block rounded-lg bg-[#2b241a] px-6 py-2 text-xs font-semibold text-[#f2ead9]">Entrar no filme →</span>
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-2xl border border-line bg-white/[0.02]">
+                    <div className="relative h-36 w-full sm:h-44">
+                      {coverPreview ? (
+                        <img src={coverPreview} alt="capa" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="h-full w-full" style={{ background: `linear-gradient(135deg, ${form.themeColor}33, ${form.themeColor}0d)` }} />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#12100b] via-transparent to-transparent" />
+                      <div className="absolute -bottom-8 left-1/2 flex h-16 w-16 -translate-x-1/2 items-center justify-center overflow-hidden rounded-full border-2 bg-[#1c160c]" style={{ borderColor: form.themeColor }}>
+                        {logoPreview
+                          ? <img src={logoPreview} alt="logo" className="h-full w-full object-cover" />
+                          : <Aperture size={22} style={{ color: form.themeColor }} />}
+                      </div>
+                    </div>
+                    <div className="px-6 pb-6 pt-11 text-center">
+                      <p className="font-serif text-xl font-semibold tracking-tight">{form.name || 'Nome do evento'}</p>
+                      <p className="mx-auto mt-1.5 max-w-sm text-xs text-cream-dim">
+                        {form.welcomeMessage.trim() || 'Sua mensagem de boas-vindas aparecerá aqui.'}
+                      </p>
+                      <span className="mt-4 inline-block rounded-full px-5 py-2 text-xs font-semibold text-[#1c160c]" style={{ background: form.themeColor }}>
+                        Entrar no álbum
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Cor de destaque */}
+              <div>
+                <label className="mb-2 flex items-center gap-1.5 text-sm font-medium text-cream-dim">
+                  <Palette size={14} /> Cor de destaque
+                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  {PRESET_COLORS.map((c) => (
+                    <button key={c} onClick={() => set('themeColor', c)}
+                      className={`h-9 w-9 rounded-full border-2 transition ${form.themeColor.toLowerCase() === c.toLowerCase() ? 'scale-110 border-white' : 'border-white/10'}`}
+                      style={{ background: c }} title={c} />
+                  ))}
+                  <label className="flex h-9 cursor-pointer items-center gap-2 rounded-full border border-line px-3 text-xs text-cream-dim">
+                    <input type="color" value={form.themeColor} onChange={(e) => set('themeColor', e.target.value)}
+                      className="h-5 w-5 cursor-pointer border-0 bg-transparent p-0" />
+                    {form.themeColor}
+                  </label>
+                </div>
+              </div>
+
+              {/* Mensagem de boas-vindas */}
+              <div>
+                <label className="mb-2 flex items-center gap-1.5 text-sm font-medium text-cream-dim">
+                  <MessageSquare size={14} /> Mensagem de boas-vindas
+                </label>
+                <textarea value={form.welcomeMessage} onChange={(e) => set('welcomeMessage', e.target.value)}
+                  rows={3} maxLength={280} placeholder="Ex.: Bem-vindos ao nosso casamento! Fotografem à vontade 💛"
+                  className="input-field resize-none" />
+                <p className="mt-1 text-right text-xs text-cream-dim/60">{form.welcomeMessage.length}/280</p>
+              </div>
+
+              {form.entryTemplate === 'convite' ? (
+                <>
+                  {/* Local do evento */}
+                  <div>
+                    <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-cream-dim">
+                      <MapPin size={14} /> Local do evento
+                    </label>
+                    <input className="input-field" value={form.venueName} maxLength={60}
+                      onChange={(e) => set('venueName', e.target.value)} placeholder="Ex.: Quinta do Vale" />
+                    <p className="mt-1.5 text-xs text-cream-dim/70">Aparece junto da data no convite.</p>
+                  </div>
+
+                  {/* Fotos do convite */}
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {[0, 1, 2].map((i) => (
+                      <div key={i}>
+                        <ImagePicker
+                          label={i === 0 ? 'Foto principal' : `Foto ${i + 1}`}
+                          hint={i === 0 ? 'Polaroid em destaque' : 'Polaroid de fundo'}
+                          file={inviteFiles[i]}
+                          onPick={() => inviteInputs[i].current?.click()}
+                          onClear={() => setInviteFile(i, null)}
+                        />
+                        <input ref={inviteInputs[i]} type="file" accept="image/*" hidden
+                          onChange={(e) => { setInviteFile(i, e.target.files?.[0] || null); e.target.value = ''; }} />
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <ImagePicker
+                    label="Imagem de capa"
+                    hint="Fundo da página de entrada"
+                    file={coverFile}
+                    onPick={() => coverInput.current?.click()}
+                    onClear={() => setCoverFile(null)}
+                  />
+                  <ImagePicker
+                    label="Logo / monograma"
+                    hint="Aparece em destaque no topo"
+                    file={logoFile}
+                    onPick={() => logoInput.current?.click()}
+                    onClear={() => setLogoFile(null)}
+                  />
+                  <input ref={coverInput} type="file" accept="image/*" hidden
+                    onChange={(e) => { setCoverFile(e.target.files?.[0] || null); e.target.value = ''; }} />
+                  <input ref={logoInput} type="file" accept="image/*" hidden
+                    onChange={(e) => { setLogoFile(e.target.files?.[0] || null); e.target.value = ''; }} />
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* Passo 4 — Plano */}
+          {step === 3 && (
+            <motion.div key="s3" {...stepAnim} className="space-y-8">
               <div>
                 <h1 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl">Escolha o plano</h1>
                 <p className="mt-2 text-sm text-cream-dim">Quantos convidados você espera?</p>
@@ -205,9 +441,9 @@ export default function NewEvent() {
             </motion.div>
           )}
 
-          {/* Passo 4 */}
-          {step === 3 && (
-            <motion.div key="s3" {...stepAnim} className="space-y-8">
+          {/* Passo 5 — Confirmar */}
+          {step === 4 && (
+            <motion.div key="s4" {...stepAnim} className="space-y-8">
               <div>
                 <h1 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl">Confirmar e criar</h1>
                 <p className="mt-2 text-sm text-cream-dim">Revise as informações antes de continuar.</p>
@@ -220,6 +456,23 @@ export default function NewEvent() {
                 <Row label="Revelação" value={form.revealAt ? new Date(form.revealAt).toLocaleString('pt-BR') : 'No encerramento'} />
                 <Row label="Fotos/convidado" value={form.photoLimitPerGuest === 0 ? 'Ilimitado' : form.photoLimitPerGuest} />
                 <Row label="Filtro" value={form.defaultFilter} />
+                <Row label="Modelo da página" value={form.entryTemplate === 'convite' ? 'Convite (polaroids)' : 'Clássico'} />
+                {form.entryTemplate === 'convite' && (
+                  <Row label="Local" value={form.venueName.trim() || '—'} />
+                )}
+                <Row label="Cor de destaque" value={
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-4 w-4 rounded-full border border-white/20" style={{ background: form.themeColor }} />
+                    {form.themeColor}
+                  </span>
+                } />
+                <Row label="Boas-vindas" value={form.welcomeMessage.trim()
+                  ? `“${form.welcomeMessage.trim().slice(0, 40)}${form.welcomeMessage.trim().length > 40 ? '…' : ''}”`
+                  : '—'} />
+                <Row label={form.entryTemplate === 'convite' ? 'Fotos do convite' : 'Capa / Logo'}
+                  value={form.entryTemplate === 'convite'
+                    ? (inviteFiles.filter(Boolean).length ? `${inviteFiles.filter(Boolean).length} foto(s)` : '—')
+                    : ([coverFile && 'Capa', logoFile && 'Logo'].filter(Boolean).join(' + ') || '—')} />
                 <Row label="Plano" value={(() => {
                   const plan = PLANS.find((p) => p.id === form.planId);
                   return plan ? `${plan.label} — ${formatBRL(plan.priceCents)}` : form.planId;
@@ -230,22 +483,53 @@ export default function NewEvent() {
         </AnimatePresence>
 
         {/* Navegação */}
-        <div className="mt-10 flex justify-between">
+        <div className="mt-10 flex items-center justify-between">
           <Button variant="ghost" onClick={() => setStep((s) => s - 1)} disabled={step === 0}>
             <ChevronLeft size={16} />
             Voltar
           </Button>
-          {step < STEPS.length - 1 ? (
-            <Button onClick={() => setStep((s) => s + 1)} disabled={step === 0 && !form.name.trim()}>
-              Continuar
-            </Button>
-          ) : (
-            <Button onClick={submit} loading={loading} disabled={loading}>
-              {loading ? 'Criando...' : 'Criar evento'}
-            </Button>
-          )}
+          <div className="flex items-center gap-4">
+            {step === 2 && (
+              <button onClick={() => setStep(3)} className="text-sm text-cream-dim underline-offset-4 transition hover:text-cream hover:underline">
+                Personalizar depois
+              </button>
+            )}
+            {step < STEPS.length - 1 ? (
+              <Button onClick={() => setStep((s) => s + 1)} disabled={step === 0 && !form.name.trim()}>
+                Continuar
+              </Button>
+            ) : (
+              <Button onClick={submit} loading={loading} disabled={loading}>
+                {loading ? 'Criando...' : 'Criar evento'}
+              </Button>
+            )}
+          </div>
         </div>
       </main>
+    </div>
+  );
+}
+
+function ImagePicker({ label, hint, file, onPick, onClear }) {
+  return (
+    <div className="rounded-xl border border-line bg-white/[0.02] p-4">
+      <p className="text-sm font-medium text-cream">{label}</p>
+      <p className="mt-0.5 text-xs text-cream-dim">{hint}</p>
+      {file ? (
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <span className="flex min-w-0 items-center gap-1.5 text-xs text-emerald-400">
+            <Check size={13} strokeWidth={3} />
+            <span className="truncate text-cream-dim">{file.name}</span>
+          </span>
+          <button onClick={onClear} className="shrink-0 text-cream-dim transition hover:text-cream" title="Remover">
+            <X size={14} />
+          </button>
+        </div>
+      ) : (
+        <button onClick={onPick} className="btn-ghost btn-sm mt-3">
+          <UploadCloud size={14} /> Escolher imagem
+        </button>
+      )}
     </div>
   );
 }

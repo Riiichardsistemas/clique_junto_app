@@ -56,6 +56,12 @@ module.exports = (sequelize) => {
       logoUrl: { type: DataTypes.STRING, allowNull: true },       // logo/monograma
       themeColor: { type: DataTypes.STRING, allowNull: true },    // cor de destaque (hex)
       welcomeMessage: { type: DataTypes.TEXT, allowNull: true },  // mensagem de boas-vindas
+      // Modelo da página de entrada: 'classic' (escuro) | 'convite' (claro, polaroids)
+      entryTemplate: { type: DataTypes.STRING, allowNull: false, defaultValue: 'classic' },
+      venueName: { type: DataTypes.STRING, allowNull: true },     // local do evento (ex: Quinta do Vale)
+      invitePhoto1Url: { type: DataTypes.STRING, allowNull: true }, // polaroids do convite
+      invitePhoto2Url: { type: DataTypes.STRING, allowNull: true },
+      invitePhoto3Url: { type: DataTypes.STRING, allowNull: true },
     },
     { tableName: 'events', timestamps: true }
   );

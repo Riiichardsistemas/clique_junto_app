@@ -77,7 +77,7 @@ export default function Login() {
 
 export function AuthShell({ title, subtitle, children }) {
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-6 py-12">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-8 sm:px-6 sm:py-12">
       {/* Grid decorativo de fundo */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.3]"

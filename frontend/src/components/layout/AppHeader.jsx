@@ -34,16 +34,16 @@ export default function AppHeader() {
         <nav className="flex items-center gap-1">
           <NavLink to="/dashboard" className={navItem}>
             <CalendarRange size={15} />
-            Eventos
+            <span className="hidden min-[420px]:inline">Eventos</span>
           </NavLink>
           <NavLink to="/albuns" className={navItem}>
             <Images size={15} />
-            Álbuns
+            <span className="hidden min-[420px]:inline">Álbuns</span>
           </NavLink>
           {user?.role === 'admin' && (
             <NavLink to="/admin" className={navItem}>
               <Crown size={15} />
-              Admin
+              <span className="hidden min-[420px]:inline">Admin</span>
             </NavLink>
           )}
         </nav>

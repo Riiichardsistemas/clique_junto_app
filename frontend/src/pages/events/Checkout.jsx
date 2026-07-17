@@ -58,7 +58,7 @@ export default function Checkout() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-lg px-6 py-10">
+      <main className="mx-auto max-w-lg px-4 py-6 sm:px-6 sm:py-10">
         {paid ? (
           <div className="card p-8 text-center animate-scalein">
             <CheckCircle2 className="mx-auto h-14 w-14 text-success" />
@@ -68,12 +68,12 @@ export default function Checkout() {
         ) : (
           <>
             {/* Resumo do plano */}
-            <div className="card mb-5 flex items-center justify-between p-5">
-              <div>
-                <p className="label-mono">{event?.name}</p>
+            <div className="card mb-5 flex items-center justify-between gap-3 p-4 sm:p-5">
+              <div className="min-w-0">
+                <p className="label-mono truncate">{event?.name}</p>
                 <p className="mt-1 text-lg text-cream">{plan?.label || event?.planId}</p>
               </div>
-              <p className="text-2xl font-semibold text-cream">{formatBRL(plan?.priceCents || 0)}</p>
+              <p className="shrink-0 text-2xl font-semibold text-cream">{formatBRL(plan?.priceCents || 0)}</p>
             </div>
 
             {!method && (
@@ -165,7 +165,7 @@ function PixPanel({ eventId, planId, onBack, onPaid }) {
   }
 
   return (
-    <div className="card animate-fadein p-6">
+    <div className="card animate-fadein p-5 sm:p-6">
       <button onClick={onBack} className="mb-4 inline-flex items-center gap-1 text-sm text-cream-dim hover:text-cream">
         <ChevronLeft size={15} /> Outros métodos
       </button>
@@ -236,7 +236,7 @@ function CardPanel({ eventId, planId, onBack, onPaid }) {
 
   const inp = 'input-field';
   return (
-    <form onSubmit={submit} className="card animate-fadein space-y-3 p-6">
+    <form onSubmit={submit} className="card animate-fadein space-y-3 p-5 sm:p-6">
       <button type="button" onClick={onBack} className="mb-1 inline-flex items-center gap-1 text-sm text-cream-dim hover:text-cream">
         <ChevronLeft size={15} /> Outros métodos
       </button>

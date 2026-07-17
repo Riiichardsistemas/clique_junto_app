@@ -48,6 +48,7 @@ async function create(req, res, next) {
     const {
       name, type, startsAt, endsAt, revealAt,
       photoLimitPerGuest, defaultFilter, isPrivate, planId,
+      themeColor, welcomeMessage, entryTemplate, venueName,
     } = req.body;
 
     if (!name) return res.status(400).json({ error: 'O nome do evento e obrigatorio.' });
@@ -81,6 +82,10 @@ async function create(req, res, next) {
       planId: plan.id,
       maxGuests: plan.maxGuests,
       slideshowKey,
+      themeColor: themeColor && /^#[0-9a-fA-F]{6}$/.test(themeColor) ? themeColor : null,
+      welcomeMessage: welcomeMessage ? String(welcomeMessage).slice(0, 280) : null,
+      entryTemplate: ['classic', 'convite'].includes(entryTemplate) ? entryTemplate : 'classic',
+      venueName: venueName ? String(venueName).slice(0, 60) : null,
       isPaid: isFree,
       pricePaidCents: isFree ? 0 : 0,
       status: isFree ? EVENT_STATUS.ACTIVE : EVENT_STATUS.DRAFT,
@@ -128,13 +133,15 @@ async function update(req, res, next) {
     if (!event) return;
 
     const fields = ['name', 'type', 'startsAt', 'endsAt', 'revealAt', 'photoLimitPerGuest', 'defaultFilter', 'isPrivate',
-      'liveWallEnabled', 'themeColor', 'welcomeMessage', 'coverImageUrl', 'logoUrl'];
+      'liveWallEnabled', 'themeColor', 'welcomeMessage', 'coverImageUrl', 'logoUrl',
+      'entryTemplate', 'venueName'];
     fields.forEach((f) => {
       if (req.body[f] !== undefined) event[f] = req.body[f];
     });
     if (event.type && !EVENT_TYPES.includes(event.type)) {
       return res.status(400).json({ error: 'Tipo de evento invalido.' });
     }
+    if (!['classic', 'convite'].includes(event.entryTemplate)) event.entryTemplate = 'classic';
     await event.save();
     res.json({ event: serialize(event) });
   } catch (err) {
@@ -281,7 +288,8 @@ async function uploadBrandingImage(req, res, next) {
     if (!file || !file.buffer || !file.buffer.length) {
       return res.status(400).json({ error: 'Nenhuma imagem enviada.' });
     }
-    const slot = req.query.slot === 'logo' ? 'logo' : 'cover';
+    const VALID_SLOTS = ['cover', 'logo', 'invite1', 'invite2', 'invite3'];
+    const slot = VALID_SLOTS.includes(req.query.slot) ? req.query.slot : 'cover';
     const storage = require('../config/storage');
     const { url } = await storage.saveObject({
       eventId: event.id,
@@ -291,8 +299,11 @@ async function uploadBrandingImage(req, res, next) {
       appUrl: process.env.APP_URL,
     });
 
-    if (slot === 'logo') event.logoUrl = url;
-    else event.coverImageUrl = url;
+    const SLOT_FIELD = {
+      cover: 'coverImageUrl', logo: 'logoUrl',
+      invite1: 'invitePhoto1Url', invite2: 'invitePhoto2Url', invite3: 'invitePhoto3Url',
+    };
+    event[SLOT_FIELD[slot]] = url;
     await event.save();
 
     res.json({ ok: true, slot, url, event: serialize(event) });
