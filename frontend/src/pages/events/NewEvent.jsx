@@ -11,6 +11,7 @@ import PlanSelector from '../../components/PlanSelector';
 import FilterSelector from '../../components/FilterSelector';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
+import Brand from '../../components/ui/Brand';
 import { PLANS, formatBRL } from '../../utils/plans';
 
 const EVENT_TYPES = [
@@ -135,20 +136,18 @@ export default function NewEvent() {
   }
 
   return (
-    <div className="min-h-screen text-cream">
-      <header className="glass sticky top-0 z-10">
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-6 py-3.5">
+    <div className="app-screen pb-24 text-cream sm:pb-0">
+      <header className="app-topbar glass sticky top-0 z-20">
+        <div className="mx-auto flex min-h-[56px] max-w-2xl items-center justify-between px-4 sm:px-6">
           <button
+            type="button"
             onClick={() => navigate('/dashboard')}
-            className="inline-flex items-center gap-1 text-sm text-cream-dim transition hover:text-cream"
+            className="inline-flex min-h-11 items-center gap-1 rounded-full px-2 text-sm text-cream-dim transition hover:text-cream"
           >
             <ChevronLeft size={16} />
             Voltar
           </button>
-          <span className="flex items-center gap-2 font-serif text-base font-semibold tracking-tight">
-            <Aperture size={15} className="text-gold" />
-            Clique Junto
-          </span>
+          <Brand compact className="[&_.brand-mark]:text-[20px]" />
           <span className="w-16" />
         </div>
       </header>
@@ -159,7 +158,7 @@ export default function NewEvent() {
           <p className="mb-3 font-mono text-[10px] uppercase tracking-wider text-cream-dim/60">
             Etapa {step + 1} de {STEPS.length}
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" role="progressbar" aria-label="Progresso da criação do evento" aria-valuemin="1" aria-valuemax={STEPS.length} aria-valuenow={step + 1}>
             {STEPS.map((s, i) => (
               <div key={s} className="flex flex-1 flex-col gap-2">
                 <div className={`h-1 rounded-full transition-all duration-300 ${
@@ -183,13 +182,13 @@ export default function NewEvent() {
                 <h1 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl">Qual é o nome do evento?</h1>
                 <p className="mt-2 text-sm text-cream-dim">Esse nome aparecerá para os seus convidados.</p>
               </div>
-              <Input placeholder="Ex: Casamento da Ana & Pedro" value={form.name}
+              <Input aria-label="Nome do evento" placeholder="Ex: Casamento da Ana & Pedro" value={form.name}
                 onChange={(e) => set('name', e.target.value)} autoFocus />
               <div>
                 <p className="mb-3 text-sm font-medium text-cream-dim">Tipo do evento</p>
                 <div className="grid grid-cols-3 gap-2 sm:gap-3">
                   {EVENT_TYPES.map(({ id, label, Icon }) => (
-                    <button key={id} onClick={() => set('type', id)}
+                    <button key={id} type="button" aria-pressed={form.type === id} onClick={() => set('type', id)}
                       className={`flex flex-col items-center gap-2 rounded-xl border px-1 py-4 text-xs font-medium transition-all duration-200 sm:gap-2.5 sm:py-5 sm:text-sm ${
                         form.type === id
                           ? 'border-gold/60 bg-gold/10 text-gold'
@@ -214,15 +213,15 @@ export default function NewEvent() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-cream-dim">Início do evento</label>
-                  <input type="datetime-local" value={form.startsAt} onChange={(e) => set('startsAt', e.target.value)} className="input-field" />
+                  <input aria-label="Início do evento" type="datetime-local" value={form.startsAt} onChange={(e) => set('startsAt', e.target.value)} className="input-field" />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-cream-dim">Encerramento (para de aceitar fotos)</label>
-                  <input type="datetime-local" value={form.endsAt} onChange={(e) => set('endsAt', e.target.value)} className="input-field" />
+                  <input aria-label="Encerramento do evento" type="datetime-local" value={form.endsAt} onChange={(e) => set('endsAt', e.target.value)} className="input-field" />
                 </div>
                 <div className="sm:col-span-2">
                   <label className="mb-1.5 block text-sm font-medium text-cream-dim">Revelação (quando as fotos aparecem)</label>
-                  <input type="datetime-local" value={form.revealAt} onChange={(e) => set('revealAt', e.target.value)} className="input-field" />
+                  <input aria-label="Revelação do álbum" type="datetime-local" value={form.revealAt} onChange={(e) => set('revealAt', e.target.value)} className="input-field" />
                   <p className="mt-1.5 text-xs text-cream-dim/70">Deixe vazio para revelar automaticamente no encerramento.</p>
                 </div>
               </div>
@@ -231,7 +230,7 @@ export default function NewEvent() {
                 <label className="mb-3 block text-sm font-medium text-cream-dim">Fotos por convidado</label>
                 <div className="flex flex-wrap gap-2">
                   {PHOTO_LIMITS.map((l) => (
-                    <button key={l.value} onClick={() => set('photoLimitPerGuest', l.value)}
+                    <button key={l.value} type="button" aria-pressed={form.photoLimitPerGuest === l.value} onClick={() => set('photoLimitPerGuest', l.value)}
                       className={`rounded-full border px-4 py-2 text-sm font-medium transition-all ${
                         form.photoLimitPerGuest === l.value
                           ? 'border-gold/70 bg-gold text-[#1c160c]'
@@ -263,7 +262,7 @@ export default function NewEvent() {
               <div>
                 <p className="mb-2 text-sm font-medium text-cream-dim">Modelo da página de entrada</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <button onClick={() => set('entryTemplate', 'classic')}
+                  <button type="button" aria-pressed={form.entryTemplate === 'classic'} onClick={() => set('entryTemplate', 'classic')}
                     className={`overflow-hidden rounded-xl border-2 text-left transition ${form.entryTemplate === 'classic' ? 'border-gold' : 'border-line hover:border-gold/40'}`}>
                     <div className="flex h-24 flex-col items-center justify-center gap-1.5 bg-[#14110b] sm:h-28">
                       <span className="h-1.5 w-12 rounded-full bg-white/20" />
@@ -273,7 +272,7 @@ export default function NewEvent() {
                     </div>
                     <p className="px-3 py-2 text-xs font-medium text-cream">Clássico <span className="font-normal text-cream-dim">— escuro</span></p>
                   </button>
-                  <button onClick={() => set('entryTemplate', 'convite')}
+                  <button type="button" aria-pressed={form.entryTemplate === 'convite'} onClick={() => set('entryTemplate', 'convite')}
                     className={`overflow-hidden rounded-xl border-2 text-left transition ${form.entryTemplate === 'convite' ? 'border-gold' : 'border-line hover:border-gold/40'}`}>
                     <div className="relative flex h-24 flex-col items-center justify-center gap-1.5 bg-[#f2ead9] sm:h-28">
                       <span className="absolute left-1/2 top-2 h-9 w-8 -translate-x-[62%] -rotate-6 rounded-sm bg-white shadow-md" />
@@ -353,8 +352,8 @@ export default function NewEvent() {
                 </label>
                 <div className="flex flex-wrap items-center gap-2">
                   {PRESET_COLORS.map((c) => (
-                    <button key={c} onClick={() => set('themeColor', c)}
-                      className={`h-9 w-9 rounded-full border-2 transition ${form.themeColor.toLowerCase() === c.toLowerCase() ? 'scale-110 border-white' : 'border-white/10'}`}
+                    <button key={c} type="button" aria-label={`Usar cor ${c}`} aria-pressed={form.themeColor === c} onClick={() => set('themeColor', c)}
+                      className={`h-11 w-11 rounded-full border-2 transition ${form.themeColor.toLowerCase() === c.toLowerCase() ? 'scale-105 border-white' : 'border-white/10'}`}
                       style={{ background: c }} title={c} />
                   ))}
                   <label className="flex h-9 cursor-pointer items-center gap-2 rounded-full border border-line px-3 text-xs text-cream-dim">
@@ -370,7 +369,7 @@ export default function NewEvent() {
                 <label className="mb-2 flex items-center gap-1.5 text-sm font-medium text-cream-dim">
                   <MessageSquare size={14} /> Mensagem de boas-vindas
                 </label>
-                <textarea value={form.welcomeMessage} onChange={(e) => set('welcomeMessage', e.target.value)}
+                <textarea aria-label="Mensagem de boas-vindas" value={form.welcomeMessage} onChange={(e) => set('welcomeMessage', e.target.value)}
                   rows={3} maxLength={280} placeholder="Ex.: Bem-vindos ao nosso casamento! Fotografem à vontade 💛"
                   className="input-field resize-none" />
                 <p className="mt-1 text-right text-xs text-cream-dim/60">{form.welcomeMessage.length}/280</p>
@@ -383,7 +382,7 @@ export default function NewEvent() {
                     <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-cream-dim">
                       <MapPin size={14} /> Local do evento
                     </label>
-                    <input className="input-field" value={form.venueName} maxLength={60}
+                    <input aria-label="Local do evento" className="input-field" value={form.venueName} maxLength={60}
                       onChange={(e) => set('venueName', e.target.value)} placeholder="Ex.: Quinta do Vale" />
                     <p className="mt-1.5 text-xs text-cream-dim/70">Aparece junto da data no convite.</p>
                   </div>
@@ -483,23 +482,23 @@ export default function NewEvent() {
         </AnimatePresence>
 
         {/* Navegação */}
-        <div className="mt-10 flex items-center justify-between">
-          <Button variant="ghost" onClick={() => setStep((s) => s - 1)} disabled={step === 0}>
+        <div className="mobile-action-bar mt-10 flex items-center justify-between gap-2">
+          <Button variant="ghost" className="!px-4 sm:!px-6" onClick={() => setStep((s) => s - 1)} disabled={step === 0}>
             <ChevronLeft size={16} />
-            Voltar
+            <span className="hidden min-[360px]:inline">Voltar</span>
           </Button>
-          <div className="flex items-center gap-4">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-4">
             {step === 2 && (
-              <button onClick={() => setStep(3)} className="text-sm text-cream-dim underline-offset-4 transition hover:text-cream hover:underline">
-                Personalizar depois
+              <button type="button" onClick={() => setStep(3)} className="min-h-11 px-1 text-xs text-cream-dim underline-offset-4 transition hover:text-cream hover:underline sm:text-sm">
+                <span className="sm:hidden">Depois</span><span className="hidden sm:inline">Personalizar depois</span>
               </button>
             )}
             {step < STEPS.length - 1 ? (
-              <Button onClick={() => setStep((s) => s + 1)} disabled={step === 0 && !form.name.trim()}>
+              <Button className="!px-5 sm:!px-6" onClick={() => setStep((s) => s + 1)} disabled={step === 0 && !form.name.trim()}>
                 Continuar
               </Button>
             ) : (
-              <Button onClick={submit} loading={loading} disabled={loading}>
+              <Button className="!px-5 sm:!px-6" onClick={submit} loading={loading} disabled={loading}>
                 {loading ? 'Criando...' : 'Criar evento'}
               </Button>
             )}
@@ -521,12 +520,12 @@ function ImagePicker({ label, hint, file, onPick, onClear }) {
             <Check size={13} strokeWidth={3} />
             <span className="truncate text-cream-dim">{file.name}</span>
           </span>
-          <button onClick={onClear} className="shrink-0 text-cream-dim transition hover:text-cream" title="Remover">
+          <button type="button" onClick={onClear} className="icon-button" title="Remover" aria-label="Remover imagem">
             <X size={14} />
           </button>
         </div>
       ) : (
-        <button onClick={onPick} className="btn-ghost btn-sm mt-3">
+        <button type="button" onClick={onPick} className="btn-ghost btn-sm mt-3">
           <UploadCloud size={14} /> Escolher imagem
         </button>
       )}

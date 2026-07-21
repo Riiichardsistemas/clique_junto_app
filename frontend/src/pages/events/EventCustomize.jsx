@@ -6,16 +6,9 @@ import {
   MessageSquare, UploadCloud, Loader2, Radio, LayoutTemplate, MapPin, Star,
 } from 'lucide-react';
 import { eventApi } from '../../api/eventApi';
+import PageLoader from '../../components/ui/PageLoader';
 
 const PRESET_COLORS = ['#C4A96C', '#E8B4B8', '#7EA4A0', '#8E7CC3', '#D98C5F', '#5B7DB1', '#B5654A', '#3F4A3C'];
-
-function Loader() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-ink">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-cream/15 border-t-cream/60" />
-    </div>
-  );
-}
 
 export default function EventCustomize() {
   const { id } = useParams();
@@ -98,13 +91,13 @@ export default function EventCustomize() {
     navigator.clipboard.writeText(telaoUrl).then(() => toast.success('Link copiado!'));
   }
 
-  if (loading) return <Loader />;
+  if (loading) return <PageLoader label="Carregando personalização" />;
 
   return (
-    <div className="min-h-screen text-cream">
-      <header className="glass sticky top-0 z-10">
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-6 py-3.5">
-          <Link to={`/events/${id}`} className="inline-flex items-center gap-1 text-sm text-cream-dim transition hover:text-cream">
+    <div className="app-screen text-cream">
+      <header className="app-topbar glass sticky top-0 z-20">
+        <div className="mx-auto flex min-h-[56px] max-w-2xl items-center justify-between px-4 sm:px-6">
+          <Link to={`/events/${id}`} className="inline-flex min-h-11 items-center gap-1 rounded-full px-2 text-sm text-cream-dim transition hover:text-cream">
             <ChevronLeft size={16} /> Voltar ao evento
           </Link>
           <span className="label-mono">Personalização</span>
@@ -115,7 +108,7 @@ export default function EventCustomize() {
         <h1 className="text-2xl sm:text-3xl">Personalizar “{event?.name}”</h1>
 
         {/* ---------- TELÃO ---------- */}
-        <section className="card p-6">
+        <section className="card p-4 sm:p-6">
           <div className="card-section-header"><Monitor /><span className="card-section-title">Telão da festa</span></div>
 
           <div className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-line bg-white/[0.02] p-3.5 sm:gap-4 sm:p-4">
@@ -126,17 +119,19 @@ export default function EventCustomize() {
                 <p className="text-xs text-cream-dim">Exibe as fotos no telão assim que os convidados tiram, antes da revelação. Desligado, o telão só roda após a revelação.</p>
               </div>
             </div>
-            <button onClick={() => toggleLive(!liveWall)}
-              className={`relative h-7 w-12 shrink-0 rounded-full transition ${liveWall ? 'bg-gold' : 'bg-white/15'}`}>
-              <span className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all ${liveWall ? 'left-6' : 'left-1'}`} />
+            <button type="button" role="switch" aria-label="Modo ao vivo no telão" aria-checked={liveWall} onClick={() => toggleLive(!liveWall)}
+              className="relative h-11 w-14 shrink-0 rounded-full">
+              <span className={`absolute left-1 top-2 h-7 w-12 rounded-full transition ${liveWall ? 'bg-gold' : 'bg-white/15'}`}>
+                <span className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all ${liveWall ? 'left-6' : 'left-1'}`} />
+              </span>
             </button>
           </div>
 
           <label className="mb-1.5 block text-sm font-medium text-cream-dim">Link do telão (secreto)</label>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <input readOnly value={telaoUrl} className="input-field min-w-0 flex-1 text-xs" onFocus={(e) => e.target.select()} />
+            <input readOnly aria-label="Link secreto do telão" value={telaoUrl} className="input-field min-w-0 flex-1 text-xs" onFocus={(e) => e.target.select()} />
             <div className="flex gap-2">
-              <button onClick={copyLink} className="btn-ghost btn-sm flex-1 sm:flex-none" title="Copiar"><Copy size={14} /><span className="sm:hidden"> Copiar</span></button>
+              <button type="button" onClick={copyLink} className="btn-ghost btn-sm flex-1 sm:flex-none" title="Copiar"><Copy size={14} /><span className="sm:hidden"> Copiar</span></button>
               <a href={telaoUrl} target="_blank" rel="noreferrer" className="btn-primary btn-sm flex-1 sm:flex-none" title="Abrir telão">
                 <ExternalLink size={14} /> Abrir
               </a>
@@ -146,12 +141,12 @@ export default function EventCustomize() {
         </section>
 
         {/* ---------- MODELO DA PÁGINA DE ENTRADA ---------- */}
-        <section className="card p-6">
+        <section className="card p-4 sm:p-6">
           <div className="card-section-header"><LayoutTemplate /><span className="card-section-title">Modelo da página de entrada</span></div>
 
           <div className="mb-5 grid grid-cols-2 gap-3">
             {/* Clássico */}
-            <button onClick={() => setEntryTemplate('classic')}
+            <button type="button" aria-pressed={entryTemplate === 'classic'} onClick={() => setEntryTemplate('classic')}
               className={`overflow-hidden rounded-xl border-2 text-left transition ${entryTemplate === 'classic' ? 'border-gold' : 'border-line hover:border-gold/40'}`}>
               <div className="flex h-28 flex-col items-center justify-center gap-1.5 bg-[#14110b] sm:h-32">
                 <span className="h-1.5 w-12 rounded-full bg-white/20" />
@@ -163,7 +158,7 @@ export default function EventCustomize() {
             </button>
 
             {/* Convite */}
-            <button onClick={() => setEntryTemplate('convite')}
+            <button type="button" aria-pressed={entryTemplate === 'convite'} onClick={() => setEntryTemplate('convite')}
               className={`overflow-hidden rounded-xl border-2 text-left transition ${entryTemplate === 'convite' ? 'border-gold' : 'border-line hover:border-gold/40'}`}>
               <div className="relative flex h-28 flex-col items-center justify-center gap-1.5 bg-[#f2ead9] sm:h-32">
                 <span className="absolute left-1/2 top-3 h-10 w-9 -translate-x-[62%] -rotate-6 rounded-sm bg-white shadow-md" />
@@ -183,7 +178,7 @@ export default function EventCustomize() {
                 <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-cream-dim">
                   <MapPin size={14} /> Local do evento
                 </label>
-                <input className="input-field" value={venueName} maxLength={60}
+                <input aria-label="Local do evento" className="input-field" value={venueName} maxLength={60}
                   onChange={(e) => setVenueName(e.target.value)} placeholder="Ex.: Quinta do Vale" />
                 <p className="mt-1.5 text-xs text-cream-dim/70">
                   Aparece junto da data: “{event?.startsAt
@@ -201,7 +196,7 @@ export default function EventCustomize() {
                     const slot = `invite${n}`;
                     return (
                       <div key={n}>
-                        <button onClick={() => inviteInputs[i].current?.click()} disabled={uploading === slot}
+                        <button type="button" onClick={() => inviteInputs[i].current?.click()} disabled={uploading === slot}
                           className={`relative block aspect-[4/5] w-full overflow-hidden rounded-lg border bg-white/[0.02] p-1.5 transition hover:border-gold/40 ${url ? 'border-line' : 'border-dashed border-line'}`}
                           style={{ transform: `rotate(${[-3, 2, -1][i]}deg)` }}>
                           <span className="flex h-[82%] w-full items-center justify-center overflow-hidden rounded-sm bg-black/30">
@@ -254,13 +249,13 @@ export default function EventCustomize() {
             </div>
           )}
 
-          <button onClick={save} disabled={saving} className="btn-primary mt-5 w-full">
+          <button type="button" onClick={save} disabled={saving} className="btn-primary mt-5 w-full">
             {saving ? <Loader2 size={16} className="animate-spin" /> : 'Salvar modelo'}
           </button>
         </section>
 
         {/* ---------- IDENTIDADE VISUAL ---------- */}
-        <section className="card p-6">
+        <section className="card p-4 sm:p-6">
           <div className="card-section-header"><Palette /><span className="card-section-title">Identidade visual da página de entrada</span></div>
 
           {/* Capa */}
@@ -277,7 +272,7 @@ export default function EventCustomize() {
             </div>
             <input ref={coverInput} type="file" accept="image/*" hidden
               onChange={(e) => handleUpload('cover', e.target.files?.[0])} />
-            <button onClick={() => coverInput.current?.click()} disabled={uploading === 'cover'}
+            <button type="button" onClick={() => coverInput.current?.click()} disabled={uploading === 'cover'}
               className="btn-ghost btn-sm mt-3">
               {uploading === 'cover' ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
               {event?.coverImageUrl ? 'Trocar capa' : 'Enviar capa'}
@@ -293,7 +288,7 @@ export default function EventCustomize() {
               </div>
               <input ref={logoInput} type="file" accept="image/*" hidden
                 onChange={(e) => handleUpload('logo', e.target.files?.[0])} />
-              <button onClick={() => logoInput.current?.click()} disabled={uploading === 'logo'} className="btn-ghost btn-sm">
+              <button type="button" onClick={() => logoInput.current?.click()} disabled={uploading === 'logo'} className="btn-ghost btn-sm">
                 {uploading === 'logo' ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
                 {event?.logoUrl ? 'Trocar logo' : 'Enviar logo'}
               </button>
@@ -305,8 +300,8 @@ export default function EventCustomize() {
             <label className="mb-2 block text-sm font-medium text-cream-dim">Cor de destaque</label>
             <div className="flex flex-wrap items-center gap-2">
               {PRESET_COLORS.map((c) => (
-                <button key={c} onClick={() => setThemeColor(c)}
-                  className={`h-9 w-9 rounded-full border-2 transition ${themeColor?.toLowerCase() === c.toLowerCase() ? 'scale-110 border-white' : 'border-white/10'}`}
+                <button key={c} type="button" aria-label={`Usar cor ${c}`} aria-pressed={themeColor?.toLowerCase() === c.toLowerCase()} onClick={() => setThemeColor(c)}
+                  className={`h-11 w-11 rounded-full border-2 transition ${themeColor?.toLowerCase() === c.toLowerCase() ? 'scale-105 border-white' : 'border-white/10'}`}
                   style={{ background: c }} title={c} />
               ))}
               <label className="flex h-9 items-center gap-2 rounded-full border border-line px-3 text-xs text-cream-dim">
@@ -322,13 +317,13 @@ export default function EventCustomize() {
             <label className="mb-2 flex items-center gap-1.5 text-sm font-medium text-cream-dim">
               <MessageSquare size={14} /> Mensagem de boas-vindas
             </label>
-            <textarea value={welcomeMessage} onChange={(e) => setWelcomeMessage(e.target.value)}
+            <textarea aria-label="Mensagem de boas-vindas" value={welcomeMessage} onChange={(e) => setWelcomeMessage(e.target.value)}
               rows={3} maxLength={280} placeholder="Ex.: Bem-vindos ao nosso casamento! Fotografem à vontade 💛"
               className="input-field resize-none" />
             <p className="mt-1 text-right text-xs text-cream-dim/60">{welcomeMessage.length}/280</p>
           </div>
 
-          <button onClick={save} disabled={saving} className="btn-primary mt-6 w-full">
+          <button type="button" onClick={save} disabled={saving} className="btn-primary mt-6 w-full">
             {saving ? <Loader2 size={16} className="animate-spin" /> : 'Salvar personalização'}
           </button>
         </section>

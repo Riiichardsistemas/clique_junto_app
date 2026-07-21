@@ -6,6 +6,7 @@ const Event = require('./Event')(sequelize);
 const Guest = require('./Guest')(sequelize);
 const Photo = require('./Photo')(sequelize);
 const Plan = require('./Plan')(sequelize);
+const AdminAuditLog = require('./AdminAuditLog')(sequelize);
 
 // ---------------------------------------------------------------------------
 // Associacoes
@@ -25,6 +26,9 @@ Photo.belongsTo(Guest, { foreignKey: 'guestId', as: 'guest' });
 Event.hasMany(Plan, { foreignKey: 'eventId', as: 'payments', onDelete: 'CASCADE' });
 Plan.belongsTo(Event, { foreignKey: 'eventId', as: 'event' });
 
+User.hasMany(AdminAuditLog, { foreignKey: 'adminUserId', as: 'adminAuditLogs', onDelete: 'SET NULL' });
+AdminAuditLog.belongsTo(User, { foreignKey: 'adminUserId', as: 'admin', onDelete: 'SET NULL' });
+
 const db = {
   sequelize,
   Sequelize: sequelize.constructor,
@@ -33,6 +37,7 @@ const db = {
   Guest,
   Photo,
   Plan,
+  AdminAuditLog,
 };
 
 module.exports = db;

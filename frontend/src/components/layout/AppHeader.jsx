@@ -1,84 +1,79 @@
 import { Link, NavLink } from 'react-router-dom';
-import { Aperture, Images, CalendarRange, Settings, LogOut, Crown } from 'lucide-react';
+import { Images, CalendarRange, Settings, LogOut, Crown } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.jsx';
+import Brand from '../ui/Brand.jsx';
+import MobileBottomNav from './MobileBottomNav.jsx';
 
 /**
- * Header unificado da área do organizador (usuário logado).
- * Usado em: Dashboard, Álbuns e Configurações da conta.
+ * Shell de navegação do organizador.
+ * Desktop usa navegação superior; mobile usa tab bar fixa ao alcance do polegar.
  */
 export default function AppHeader() {
   const { user, logout } = useAuth();
   const initial = (user?.name || '?').trim().charAt(0).toUpperCase();
 
   const navItem = ({ isActive }) =>
-    `flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition ${
+    `flex min-h-11 items-center gap-2 rounded-full border px-3.5 text-sm font-bold transition ${
       isActive
-        ? 'bg-gold/[0.12] text-gold'
-        : 'text-cream-dim hover:bg-gold/[0.06] hover:text-cream'
+        ? 'border-gold/30 bg-gold/[0.10] text-gold-light'
+        : 'border-transparent text-cream-dim hover:bg-white/[0.045] hover:text-cream'
     }`;
 
   return (
-    <header className="glass sticky top-0 z-20">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-        {/* Logo */}
-        <Link to="/dashboard" className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-gold/25 bg-gold/[0.08]">
-            <Aperture size={15} className="text-gold" />
-          </span>
-          <span className="hidden font-serif text-base font-semibold tracking-tight sm:inline">
-            Clique Junto
-          </span>
-        </Link>
+    <>
+      <header className="app-topbar glass sticky top-0 z-20">
+        <div className="mx-auto flex min-h-[60px] max-w-6xl items-center justify-between gap-2 px-4 sm:px-6">
+          <Brand className="[&_.brand-name]:text-[20px]" />
 
-        {/* Navegação principal */}
-        <nav className="flex items-center gap-1">
-          <NavLink to="/dashboard" className={navItem}>
-            <CalendarRange size={15} />
-            <span className="hidden min-[420px]:inline">Eventos</span>
-          </NavLink>
-          <NavLink to="/albuns" className={navItem}>
-            <Images size={15} />
-            <span className="hidden min-[420px]:inline">Álbuns</span>
-          </NavLink>
-          {user?.role === 'admin' && (
-            <NavLink to="/admin" className={navItem}>
-              <Crown size={15} />
-              <span className="hidden min-[420px]:inline">Admin</span>
+          <nav className="hidden items-center gap-0.5 md:flex" aria-label="Navegação principal">
+            <NavLink to="/dashboard" className={navItem} aria-label="Eventos">
+              <CalendarRange size={15} aria-hidden="true" />
+              <span>Eventos</span>
             </NavLink>
-          )}
-        </nav>
+            <NavLink to="/albuns" className={navItem} aria-label="Álbuns">
+              <Images size={15} aria-hidden="true" />
+              <span>Álbuns</span>
+            </NavLink>
+            {user?.role === 'admin' && (
+              <NavLink to="/admin" className={navItem} aria-label="Administração">
+                <Crown size={15} aria-hidden="true" />
+                <span>Admin</span>
+              </NavLink>
+            )}
+          </nav>
 
-        {/* Ações do usuário */}
-        <div className="flex items-center gap-1">
-          <NavLink
-            to="/account"
-            className={({ isActive }) =>
-              `flex h-9 w-9 items-center justify-center rounded-lg transition ${
-                isActive
-                  ? 'bg-gold/[0.12] text-gold'
-                  : 'text-cream-dim hover:bg-gold/[0.06] hover:text-cream'
-              }`
-            }
-            title="Configurações da conta"
-          >
-            <Settings size={16} />
-          </NavLink>
-          <button
-            onClick={logout}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-cream-dim transition hover:bg-gold/[0.06] hover:text-cream"
-            title="Sair"
-          >
-            <LogOut size={16} />
-          </button>
+          <div className="hidden items-center gap-1 md:flex">
+            <NavLink
+              to="/account"
+              className={({ isActive }) =>
+                `icon-button ${isActive ? 'border-gold/30 bg-gold/[0.10] text-gold-light' : ''}`
+              }
+              aria-label="Configurações da conta"
+            >
+              <Settings size={16} aria-hidden="true" />
+            </NavLink>
+            <button type="button" onClick={logout} className="icon-button" aria-label="Sair da conta">
+              <LogOut size={16} aria-hidden="true" />
+            </button>
+            <Link
+              to="/account"
+              className="ml-1 flex h-10 w-10 items-center justify-center rounded-full border border-gold/30 bg-gold/[0.10] text-sm font-bold text-gold-light transition hover:border-gold/50"
+              aria-label={user?.name ? `Conta de ${user.name}` : 'Conta'}
+            >
+              {initial}
+            </Link>
+          </div>
+
           <Link
             to="/account"
-            className="ml-2 flex h-8 w-8 items-center justify-center rounded-full border border-gold/30 bg-gold/[0.10] text-sm font-medium text-gold transition hover:border-gold/50"
-            title={user?.name || 'Conta'}
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-gold/30 bg-gold/[0.10] text-sm font-bold text-gold-light md:hidden"
+            aria-label={user?.name ? `Conta de ${user.name}` : 'Conta'}
           >
             {initial}
           </Link>
         </div>
-      </div>
-    </header>
+      </header>
+      <MobileBottomNav />
+    </>
   );
 }

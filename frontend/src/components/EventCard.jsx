@@ -19,7 +19,7 @@ export default function EventCard({ event }) {
   return (
     <Link
       to={`/events/${event.id}`}
-      className="card card-hover group relative block overflow-hidden p-6"
+      className="card card-hover group relative block overflow-hidden p-5 sm:p-6"
     >
       {/* Glow sutil no hover */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-gold/[0.06] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />

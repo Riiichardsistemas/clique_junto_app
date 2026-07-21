@@ -71,6 +71,10 @@ async function login(req, res, next) {
     const ok = await user.checkPassword(password);
     if (!ok) return invalid();
 
+    if (!user.isActive) {
+      return res.status(403).json({ error: 'Esta conta esta desativada. Fale com o suporte.' });
+    }
+
     const token = generateAuthToken(user);
     return res.json({ user: user.toJSON(), token });
   } catch (err) {

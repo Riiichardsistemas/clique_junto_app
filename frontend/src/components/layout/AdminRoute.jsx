@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
-import Spinner from '../ui/Spinner';
+import PageLoader from '../ui/PageLoader';
 
 /** Protege rotas do painel: exige usuário autenticado E role === 'admin'. */
 export default function AdminRoute({ children }) {
@@ -8,11 +8,7 @@ export default function AdminRoute({ children }) {
   const location = useLocation();
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-ink text-gold">
-        <Spinner className="h-8 w-8" />
-      </div>
-    );
+    return <PageLoader label="Verificando acesso administrativo" />;
   }
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location }} />;

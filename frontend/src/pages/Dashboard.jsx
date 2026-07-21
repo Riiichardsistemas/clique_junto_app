@@ -10,30 +10,36 @@ export default function Dashboard() {
   const { user } = useAuth();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
+  function loadEvents() {
+    setLoading(true);
+    setError(false);
     eventApi.list()
       .then((d) => setEvents(d.events || []))
-      .catch(() => {})
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, []);
+  }
+
+  useEffect(() => { loadEvents(); }, []);
 
   const active = events.filter((e) => e.status === 'active');
   const others = events.filter((e) => e.status !== 'active');
 
   return (
-    <div className="min-h-screen text-cream">
+    <div className="app-shell text-cream">
       <AppHeader />
 
       <main className="mx-auto max-w-6xl px-4 py-7 sm:px-6 sm:py-10">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4 sm:mb-10">
           <div>
-            <h1 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl md:text-[42px]">Meus Eventos</h1>
+            <p className="label-mono mb-2 text-gold">Painel do organizador</p>
+            <h1 className="text-gradient font-serif text-3xl font-semibold tracking-tight sm:text-4xl md:text-[42px]">Meus Eventos</h1>
             <p className="mt-2 text-sm text-cream-dim">
               Olá, {user?.name?.split(' ')[0] || 'organizador'} — gerencie seus álbuns.
             </p>
           </div>
-          <Link to="/events/new" className="btn-primary">
+          <Link to="/events/new" className="btn-primary hidden md:inline-flex">
             <Plus size={16} />
             Novo evento
           </Link>
@@ -44,6 +50,12 @@ export default function Dashboard() {
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="skeleton h-[150px] rounded-glass" style={{ animationDelay: `${i * 0.08}s` }} />
             ))}
+          </div>
+        ) : error ? (
+          <div className="card flex flex-col items-center px-6 py-16 text-center" role="alert">
+            <p className="font-serif text-2xl text-cream">Não foi possível carregar seus eventos</p>
+            <p className="mt-2 max-w-sm text-sm leading-6 text-cream-dim">Verifique sua conexão e tente novamente. Nenhuma alteração foi perdida.</p>
+            <button type="button" className="btn-ghost mt-6" onClick={loadEvents}>Tentar novamente</button>
           </div>
         ) : events.length === 0 ? (
           <div className="flex animate-fadein flex-col items-center rounded-3xl border border-dashed border-line py-16 text-center sm:py-20">

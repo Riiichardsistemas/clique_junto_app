@@ -69,7 +69,7 @@ export default function ForgotPassword() {
           {loading ? 'Enviando…' : 'Enviar link'}
         </Button>
 
-        <Link to="/login" className="block text-center text-sm text-cream-dim transition hover:text-cream">
+        <Link to="/login" className="flex min-h-11 items-center justify-center text-center text-sm text-cream-dim transition hover:text-cream">
           Voltar para o login
         </Link>
       </form>

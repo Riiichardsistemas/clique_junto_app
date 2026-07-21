@@ -1,26 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   ChevronLeft, ChevronRight, Pencil, Trash2, Rocket, Lock, Sparkles, Download,
-  Copy, QrCode, Clapperboard, X, Images, CreditCard, Palette, Monitor,
+  Copy, QrCode, Clapperboard, X, Images, CreditCard, Palette, Monitor, MoreHorizontal,
 } from 'lucide-react';
 import { eventApi } from '../../api/eventApi';
-import { paymentApi } from '../../api/paymentApi';
+import { photoApi } from '../../api/photoApi';
+import api from '../../api/axios';
 import QRCodeDisplay from '../../components/QRCodeDisplay';
+import PageLoader from '../../components/ui/PageLoader';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import MobileActionSheet from '../../components/ui/MobileActionSheet';
+import useLightboxNavigation from '../../hooks/useLightboxNavigation';
 
 const TYPE_LABEL = {
   casamento: 'Casamento', festa: 'Festa', aniversario: 'Aniversário',
   corporativo: 'Corporativo', viagem: 'Viagem', outro: 'Evento',
 };
-
-function Loader() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-ink">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-cream/15 border-t-cream/60" />
-    </div>
-  );
-}
 
 function StatusBadge({ status }) {
   const map = { draft: 'badge-draft', active: 'badge-active', closed: 'badge-closed', revealed: 'badge-revealed' };
@@ -79,6 +76,20 @@ export default function EventDashboard() {
   const [recapStatus, setRecapStatus] = useState(null);
   const [recapUrl, setRecapUrl] = useState(null);
   const [recapGenerating, setRecapGenerating] = useState(false);
+  const [confirmation, setConfirmation] = useState(null);
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
+  const confirmationResolve = useRef(null);
+
+  function askConfirmation(options) {
+    setConfirmation(options);
+    return new Promise((resolve) => { confirmationResolve.current = resolve; });
+  }
+
+  function settleConfirmation(result) {
+    confirmationResolve.current?.(result);
+    confirmationResolve.current = null;
+    setConfirmation(null);
+  }
 
   useEffect(() => {
     eventApi.getOne(id)
@@ -96,13 +107,10 @@ export default function EventDashboard() {
   // Busca status do recap quando evento é revelado
   useEffect(() => {
     if (!event || event.status !== 'revealed') return;
-    const base = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
-    import('../../api/axios').then(({ default: api }) => {
-      api.get(`/recap/${event.id}/status`).then((r) => {
-        setRecapStatus(r.data.recapStatus || null);
-        setRecapUrl(r.data.recapVideoUrl || null);
-      }).catch(() => {});
-    });
+    api.get(`/recap/${event.id}/status`).then((r) => {
+      setRecapStatus(r.data.recapStatus || null);
+      setRecapUrl(r.data.recapVideoUrl || null);
+    }).catch(() => {});
   }, [event?.status, event?.id]);
 
   useEffect(() => {
@@ -115,10 +123,17 @@ export default function EventDashboard() {
     }
   }, [tab, event]);
 
+  useLightboxNavigation(lightbox, setLightbox, photos.length);
+
   async function handleDeletePhoto(photoId) {
-    if (!window.confirm('Remover esta foto?')) return;
+    if (!await askConfirmation({
+      title: 'Remover esta foto?',
+      description: 'A foto deixará de aparecer no álbum e não poderá ser recuperada.',
+      confirmLabel: 'Remover foto',
+      danger: true,
+    })) return;
     try {
-      await import('../../api/photoApi').then(({ photoApi }) => photoApi.remove(photoId));
+      await photoApi.remove(photoId);
       setPhotos((ps) => ps.filter((p) => p.id !== photoId));
       if (lightbox !== null) setLightbox(null);
       setEvent((ev) => ({ ...ev, photoCount: Math.max(0, (ev.photoCount ?? 1) - 1) }));
@@ -143,7 +158,11 @@ export default function EventDashboard() {
   }
 
   async function handleClose() {
-    if (!window.confirm('Encerrar o evento? Convidados não poderão mais enviar fotos.')) return;
+    if (!await askConfirmation({
+      title: 'Encerrar o evento?',
+      description: 'Os convidados não poderão mais enviar fotos. Você ainda poderá revelar o álbum depois.',
+      confirmLabel: 'Encerrar evento',
+    })) return;
     setActing(true);
     try {
       const d = await eventApi.close(event.id);
@@ -154,7 +173,11 @@ export default function EventDashboard() {
   }
 
   async function handleReveal() {
-    if (!window.confirm('Revelar todas as fotos agora?')) return;
+    if (!await askConfirmation({
+      title: 'Revelar todas as fotos?',
+      description: 'O álbum ficará disponível para os participantes imediatamente.',
+      confirmLabel: 'Revelar agora',
+    })) return;
     setActing(true);
     try {
       const d = await eventApi.reveal(event.id);
@@ -168,7 +191,6 @@ export default function EventDashboard() {
     setRecapGenerating(true);
     setRecapStatus('processing');
     try {
-      const { default: api } = await import('../../api/axios');
       await api.post('/recap/generate', { eventId: event.id });
       toast.success('Gerando recap… você receberá um email quando estiver pronto.');
       // Poll a cada 10s
@@ -224,7 +246,12 @@ export default function EventDashboard() {
   }
 
   async function handleDelete() {
-    if (!window.confirm(`Excluir "${event.name}"? Isso remove todas as fotos permanentemente.`)) return;
+    if (!await askConfirmation({
+      title: `Excluir “${event.name}”?`,
+      description: 'O evento, os convidados e todas as fotos serão removidos permanentemente.',
+      confirmLabel: 'Excluir evento',
+      danger: true,
+    })) return;
     setActing(true);
     try {
       await eventApi.delete(event.id);
@@ -234,7 +261,12 @@ export default function EventDashboard() {
   }
 
   async function handleBanGuest(guestId) {
-    if (!window.confirm('Remover este convidado?')) return;
+    if (!await askConfirmation({
+      title: 'Remover este convidado?',
+      description: 'O acesso desta participação será encerrado, sem apagar as fotos já enviadas.',
+      confirmLabel: 'Remover convidado',
+      danger: true,
+    })) return;
     try {
       await eventApi.banGuest(event.id, guestId, true);
       setGuests((g) => g.filter((x) => x.id !== guestId));
@@ -258,7 +290,7 @@ export default function EventDashboard() {
     }
   }
 
-  if (loading) return <Loader />;
+  if (loading) return <PageLoader label="Carregando evento" />;
 
   const guestUrl = `${window.location.origin}/e/${event.slug}`;
   const createdAt = new Date(event.createdAt).toLocaleDateString('pt-BR');
@@ -268,10 +300,19 @@ export default function EventDashboard() {
   const recentGuests = [...guests].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
 
   return (
-    <div className="min-h-screen text-cream">
-      <header className="glass sticky top-0 z-10">
-        <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-x-1.5 gap-y-1 px-4 py-2.5 sm:px-6">
-          <Link to="/dashboard" className="inline-flex items-center gap-1 text-sm text-cream-dim transition hover:text-cream">
+    <div className="app-screen pb-24 text-cream sm:pb-0">
+      <header className="app-topbar glass sticky top-0 z-20">
+        <div className="mx-auto flex min-h-[56px] max-w-3xl items-center gap-2 px-3 sm:hidden">
+          <Link to="/dashboard" className="icon-button" aria-label="Voltar para eventos">
+            <ChevronLeft size={19} />
+          </Link>
+          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-cream">{event.name}</p>
+          <button type="button" className="icon-button" onClick={() => setMobileActionsOpen(true)} aria-label="Mais ações do evento">
+            <MoreHorizontal size={20} />
+          </button>
+        </div>
+        <div className="mx-auto hidden max-w-3xl flex-wrap items-center gap-x-1.5 gap-y-1 px-4 py-2.5 sm:flex sm:px-6">
+          <Link to="/dashboard" className="inline-flex min-h-11 items-center gap-1 rounded-full px-2 text-sm text-cream-dim transition hover:text-cream">
             <ChevronLeft size={16} />
             Eventos
           </Link>
@@ -300,9 +341,9 @@ export default function EventDashboard() {
               <span className="hidden sm:inline">Telão</span>
             </a>
           )}
-          <button onClick={handleDelete} disabled={acting}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-red-400/60 transition hover:bg-red-500/10 hover:text-red-400 disabled:opacity-40"
-            title="Excluir">
+          <button type="button" onClick={handleDelete} disabled={acting}
+            className="icon-button !h-10 !w-10 text-red-400/60 hover:text-red-400 disabled:opacity-40"
+            title="Excluir" aria-label="Excluir evento">
             <Trash2 size={15} />
           </button>
           {event.status === 'draft' && event.isPaid && (
@@ -338,6 +379,35 @@ export default function EventDashboard() {
         </div>
       </header>
 
+      <MobileActionSheet open={mobileActionsOpen} title="Ações do evento" onClose={() => setMobileActionsOpen(false)}>
+        <div className="space-y-2" onClick={() => setMobileActionsOpen(false)}>
+          {(event.photoCount ?? 0) > 0 && (
+            <Link to={`/events/${event.id}/album`} className="flex min-h-12 w-full items-center gap-3 rounded-2xl border border-line bg-white/[0.025] px-4 text-sm font-semibold text-cream">
+              <Images size={18} className="text-gold" /> Ver álbum
+            </Link>
+          )}
+          <button type="button" onClick={openEdit} className="flex min-h-12 w-full items-center gap-3 rounded-2xl border border-line bg-white/[0.025] px-4 text-sm font-semibold text-cream">
+            <Pencil size={18} className="text-gold" /> Editar informações
+          </button>
+          <Link to={`/events/${event.id}/personalizar`} className="flex min-h-12 w-full items-center gap-3 rounded-2xl border border-line bg-white/[0.025] px-4 text-sm font-semibold text-cream">
+            <Palette size={18} className="text-gold" /> Personalizar experiência
+          </Link>
+          {event.slideshowKey && (
+            <a href={`/telao/${event.slideshowKey}`} target="_blank" rel="noreferrer" className="flex min-h-12 w-full items-center gap-3 rounded-2xl border border-line bg-white/[0.025] px-4 text-sm font-semibold text-cream">
+              <Monitor size={18} className="text-gold" /> Abrir telão
+            </a>
+          )}
+          {event.status === 'active' && (
+            <button type="button" disabled={acting} onClick={handleClose} className="flex min-h-12 w-full items-center gap-3 rounded-2xl border border-line bg-white/[0.025] px-4 text-sm font-semibold text-cream">
+              <Lock size={18} className="text-warning" /> Encerrar evento
+            </button>
+          )}
+          <button type="button" disabled={acting} onClick={handleDelete} className="flex min-h-12 w-full items-center gap-3 rounded-2xl border border-danger/20 bg-danger/[0.055] px-4 text-sm font-semibold text-danger">
+            <Trash2 size={18} /> Excluir evento
+          </button>
+        </div>
+      </MobileActionSheet>
+
       <main className="mx-auto max-w-3xl px-4 py-5 sm:px-6 sm:py-6">
         {/* Título — agrupado com badge e tipo na mesma linha */}
         <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 sm:mb-5">
@@ -366,10 +436,10 @@ export default function EventDashboard() {
         </div>
 
         {/* Tabs — contagens só aparecem em telas maiores */}
-        <div className="mb-4 flex gap-1 rounded-xl border border-line bg-surface p-1 sm:mb-5">
+        <div className="mb-4 flex gap-1 rounded-xl border border-line bg-surface p-1 sm:mb-5" role="tablist" aria-label="Seções do evento">
           {[['overview', 'Geral', 'Visão geral'], ['photos', 'Fotos', `Fotos · ${photoCount}`], ['guests', 'Convid.', `Convidados · ${guestCount}`], ['qr', 'QR', 'QR Code']].map(([key, short, full]) => (
-            <button key={key} onClick={() => setTab(key)}
-              className={`min-w-0 flex-1 truncate rounded-lg px-1 py-1.5 text-xs font-medium transition-all duration-200 sm:text-[13px] ${
+            <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)}
+              className={`min-h-11 min-w-0 flex-1 truncate rounded-lg px-1 py-2 text-xs font-medium transition-all duration-200 sm:text-[13px] ${
                 tab === key
                   ? 'bg-gold text-[#1c160c] shadow-[0_4px_16px_-4px_rgba(196,169,108,0.5)]'
                   : 'text-cream-dim hover:bg-gold/[0.05] hover:text-cream'}`}>
@@ -511,7 +581,7 @@ export default function EventDashboard() {
                       {/* Botão deletar — aparece no hover */}
                       <button
                         onClick={() => handleDeletePhoto(p.id)}
-                        className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-ink/70 text-cream/60 backdrop-blur-sm transition-opacity hover:text-red-400 sm:opacity-0 sm:group-hover:opacity-100"
+                        className="absolute right-1 top-1 flex h-11 w-11 items-center justify-center rounded-full bg-ink/70 text-cream/60 backdrop-blur-sm transition-opacity hover:text-red-400 sm:right-2 sm:top-2 sm:h-7 sm:w-7 sm:opacity-0 sm:group-hover:opacity-100"
                         title="Remover foto">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
                       </button>
@@ -529,23 +599,24 @@ export default function EventDashboard() {
             {/* Lightbox */}
             {lightbox !== null && photos[lightbox] && (
               <div className="fixed inset-0 z-50 flex animate-fadein items-center justify-center bg-black/95 backdrop-blur-sm"
+                role="dialog" aria-modal="true" aria-label={`Foto ${lightbox + 1} de ${photos.length}`}
                 onClick={() => setLightbox(null)}>
-                <button className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/60 transition hover:bg-white/10 hover:text-white"
+                <button type="button" aria-label="Fechar foto" className="safe-fixed-top icon-button absolute right-4 border-white/10 bg-white/[0.06] text-white/60 hover:text-white sm:right-5"
                   onClick={() => setLightbox(null)}><X size={17} /></button>
-                <button className="absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/50 transition hover:bg-white/10 hover:text-white"
+                <button type="button" aria-label="Foto anterior" className="icon-button absolute left-3 top-1/2 -translate-y-1/2 border-white/10 bg-white/[0.06] text-white/50 hover:text-white"
                   onClick={(e) => { e.stopPropagation(); setLightbox((s) => Math.max(0, s - 1)); }}><ChevronLeft size={19} /></button>
                 {photos[lightbox].mediaType === 'video' ? (
                   <video src={photos[lightbox].url} autoPlay loop controls playsInline
-                    className="max-h-[85vh] max-w-[90vw] rounded-2xl object-contain"
+                    className="lightbox-media max-w-[90vw] rounded-2xl object-contain"
                     onClick={(e) => e.stopPropagation()} />
                 ) : (
                   <img src={photos[lightbox].url} alt="Foto"
-                    className="max-h-[85vh] max-w-[90vw] rounded-2xl object-contain"
+                    className="lightbox-media max-w-[90vw] rounded-2xl object-contain"
                     onClick={(e) => e.stopPropagation()} />
                 )}
-                <button className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/50 transition hover:bg-white/10 hover:text-white"
+                <button type="button" aria-label="Próxima foto" className="icon-button absolute right-3 top-1/2 -translate-y-1/2 border-white/10 bg-white/[0.06] text-white/50 hover:text-white"
                   onClick={(e) => { e.stopPropagation(); setLightbox((s) => Math.min(photos.length - 1, s + 1)); }}><ChevronRight size={19} /></button>
-                <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-4">
+                <div className="safe-fixed-bottom absolute left-1/2 flex -translate-x-1/2 items-center gap-4">
                   <span className="film-counter">
                     {lightbox + 1} / {photos.length}
                     {photos[lightbox].guestNickname && <span className="text-cream/50"> · {photos[lightbox].guestNickname}</span>}
@@ -597,17 +668,33 @@ export default function EventDashboard() {
         )}
       </main>
 
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-ink/90 px-4 pt-3 backdrop-blur-xl sm:hidden" style={{ paddingBottom: 'max(.75rem, env(safe-area-inset-bottom))' }}>
+        {event.status === 'draft' && event.isPaid && (
+          <button disabled={acting} onClick={handlePublish} className="btn-primary w-full"><Rocket size={17} /> Publicar evento</button>
+        )}
+        {event.status === 'draft' && !event.isPaid && (
+          <button disabled={acting} onClick={handlePay} className="btn-primary w-full"><CreditCard size={17} /> Pagar e ativar</button>
+        )}
+        {(event.status === 'active' || event.status === 'closed') && (
+          <button disabled={acting} onClick={handleReveal} className="btn-primary w-full"><Sparkles size={17} /> Revelar agora</button>
+        )}
+        {event.status === 'revealed' && (
+          <button onClick={downloadZip} className="btn-primary w-full"><Download size={17} /> Baixar todas</button>
+        )}
+      </div>
+
       {/* Modal de edição */}
       {editOpen && (
-        <div className="fixed inset-0 z-50 flex animate-fadein items-center justify-center bg-black/80 px-4 backdrop-blur-md"
+        <div className="dialog-backdrop animate-fadein"
           onClick={() => setEditOpen(false)}>
           <form onSubmit={handleSaveEdit}
-            className="max-h-[90vh] w-full max-w-md animate-scalein overflow-y-auto rounded-glass border border-line bg-ink p-5 shadow-2xl sm:p-6"
+            className="dialog-panel max-h-[90vh] overflow-y-auto"
+            role="dialog" aria-modal="true" aria-labelledby="edit-event-title"
             onClick={(e) => e.stopPropagation()}>
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="font-serif text-xl font-semibold tracking-tight">Editar evento</h2>
+              <h2 id="edit-event-title" className="font-serif text-xl font-semibold tracking-tight">Editar evento</h2>
               <button type="button" onClick={() => setEditOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-cream-dim transition hover:bg-gold/[0.08] hover:text-cream">
+                className="icon-button -mr-2 -mt-2" aria-label="Fechar edição">
                 <X size={16} />
               </button>
             </div>
@@ -615,14 +702,14 @@ export default function EventDashboard() {
             <div className="space-y-4">
               <div>
                 <label className="label-mono mb-1.5 block text-cream/40">Nome</label>
-                <input className="input-field" value={editForm.name}
+                <input aria-label="Nome do evento" className="input-field" value={editForm.name}
                   onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
                   required maxLength={80} />
               </div>
 
               <div>
                 <label className="label-mono mb-1.5 block text-cream/40">Tipo</label>
-                <select className="input-field" value={editForm.type}
+                <select aria-label="Tipo do evento" className="input-field" value={editForm.type}
                   onChange={(e) => setEditForm((f) => ({ ...f, type: e.target.value }))}>
                   {[['casamento','Casamento'],['festa','Festa'],['aniversario','Aniversário'],
                     ['corporativo','Corporativo'],['viagem','Viagem'],['outro','Outro']].map(([v,l]) => (
@@ -634,19 +721,19 @@ export default function EventDashboard() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label className="label-mono mb-1.5 block text-cream/40">Início</label>
-                  <input type="datetime-local" className="input-field text-sm" value={editForm.startsAt}
+                  <input aria-label="Início do evento" type="datetime-local" className="input-field text-sm" value={editForm.startsAt}
                     onChange={(e) => setEditForm((f) => ({ ...f, startsAt: e.target.value }))} />
                 </div>
                 <div>
                   <label className="label-mono mb-1.5 block text-cream/40">Encerramento</label>
-                  <input type="datetime-local" className="input-field text-sm" value={editForm.endsAt}
+                  <input aria-label="Encerramento do evento" type="datetime-local" className="input-field text-sm" value={editForm.endsAt}
                     onChange={(e) => setEditForm((f) => ({ ...f, endsAt: e.target.value }))} />
                 </div>
               </div>
 
               <div>
                 <label className="label-mono mb-1.5 block text-cream/40">Revelação</label>
-                <input type="datetime-local" className="input-field text-sm" value={editForm.revealAt}
+                <input aria-label="Revelação do álbum" type="datetime-local" className="input-field text-sm" value={editForm.revealAt}
                   onChange={(e) => setEditForm((f) => ({ ...f, revealAt: e.target.value }))} />
               </div>
 
@@ -654,7 +741,7 @@ export default function EventDashboard() {
                 <label className="label-mono mb-1.5 block text-cream/40">
                   Fotos por convidado <span className="text-cream/25">(0 = ilimitado)</span>
                 </label>
-                <input type="number" min="0" max="200" className="input-field" value={editForm.photoLimitPerGuest}
+                <input aria-label="Fotos por convidado" type="number" min="0" max="200" className="input-field" value={editForm.photoLimitPerGuest}
                   onChange={(e) => setEditForm((f) => ({ ...f, photoLimitPerGuest: e.target.value }))} />
               </div>
             </div>
@@ -670,6 +757,14 @@ export default function EventDashboard() {
           </form>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmation}
+        {...confirmation}
+        busy={acting}
+        onCancel={() => settleConfirmation(false)}
+        onConfirm={() => settleConfirmation(true)}
+      />
     </div>
   );
 }

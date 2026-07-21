@@ -4,6 +4,7 @@ import { X, ImagePlus, SwitchCamera } from 'lucide-react';
 import { guestApi } from '../../api/guestApi';
 import { FILTER_DEFS, applyFilterToBlob } from '../../utils/filters';
 import { enqueueUpload, subscribeQueue, processQueue } from '../../utils/uploadQueue';
+import PageLoader from '../../components/ui/PageLoader';
 
 const MAX_VIDEO_SECONDS = 15;
 
@@ -16,14 +17,6 @@ const CAMERA_FILTERS = [
   { id: 'vintage',  label: 'Sépia',           tag: 'Vintage' },
   { id: 'cinema',   label: 'Cinema',          tag: 'Film' },
 ].map((f) => ({ ...f, css: FILTER_DEFS[f.id]?.cssFilter || 'none' }));
-
-function Loader() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-ink-deep">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-cream/15 border-t-cream/60" />
-    </div>
-  );
-}
 
 async function compressImage(file, maxDim = 1600, quality = 0.82) {
   return new Promise((resolve) => {
@@ -50,7 +43,7 @@ async function compressImage(file, maxDim = 1600, quality = 0.82) {
 
 function PreviewScreen({ previewUrl, onRetake, onUpload, uploading, filter, isVideo }) {
   return (
-    <div className="flex min-h-screen flex-col bg-ink-deep">
+    <div className="app-screen flex flex-col bg-ink-deep">
       <div className="relative flex-1 overflow-hidden">
         {isVideo ? (
           <video src={previewUrl} autoPlay loop playsInline controls={false}
@@ -94,6 +87,7 @@ export default function Camera() {
 
   const [activeFilter, setActiveFilter] = useState(CAMERA_FILTERS[1]); // Kodak por padrão
   const [stream, setStream] = useState(null);
+  const [cameraError, setCameraError] = useState(false);
   const [facingMode, setFacingMode] = useState('environment');
   const [previewUrl, setPreviewUrl] = useState(null);
   const [capturedBlob, setCapturedBlob] = useState(null);
@@ -152,8 +146,9 @@ export default function Camera() {
         audio: withAudio,
       });
       setStream(s);
+      setCameraError(false);
       if (videoRef.current) videoRef.current.srcObject = s;
-    } catch { /* sem permissão de câmera — pode usar upload */ }
+    } catch { setCameraError(true); }
   }, [stream, facingMode, mode]);
 
   // Status da fila de upload (offline/retry)
@@ -304,9 +299,9 @@ export default function Camera() {
     }
   }
 
-  if (loading) return <Loader />;
+  if (loading) return <PageLoader label="Preparando câmera" />;
   if (authError) return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-ink-deep px-6 text-center text-cream">
+    <div className="app-screen flex flex-col items-center justify-center gap-4 bg-ink-deep px-6 text-center text-cream">
       <p className="font-serif text-2xl">Sessão expirada</p>
       <p className="text-sm text-cream/40">Entre novamente para continuar.</p>
       <Link to={`/e/${slug}`} className="btn-film mt-2 rounded-2xl px-6 py-3 text-sm">Voltar</Link>
@@ -320,7 +315,7 @@ export default function Camera() {
 
   if (isClosed) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-ink-deep px-6 text-center text-cream">
+      <div className="app-screen flex flex-col items-center justify-center gap-6 bg-ink-deep px-6 text-center text-cream">
         <div className="font-serif text-3xl">Evento encerrado</div>
         <p className="text-sm text-cream/40">As fotos serão reveladas em breve.</p>
         <Link to={`/e/${slug}/album`} className="btn-film rounded-2xl px-8 py-3 text-sm">Ver álbum</Link>
@@ -339,7 +334,7 @@ export default function Camera() {
   // Filme completo: convite claro para o álbum (em vez de botão apagado)
   if (!unlimited && remaining <= 0) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-ink-deep px-6 text-center text-cream">
+      <div className="app-screen flex flex-col items-center justify-center gap-5 bg-ink-deep px-6 text-center text-cream">
         <p className="font-serif text-3xl font-semibold tracking-tight">Filme completo</p>
         <p className="max-w-xs text-sm text-cream/45">
           Você usou seus {maxPhotos} frames. Suas memórias estão guardadas para a revelação.
@@ -353,18 +348,18 @@ export default function Camera() {
   }
 
   return (
-    <div className="relative flex min-h-screen select-none flex-col overflow-hidden bg-ink-deep">
+    <div className="camera-app relative flex h-[100dvh] select-none flex-col overflow-hidden bg-ink-deep">
       {flashActive && <div className="pointer-events-none absolute inset-0 z-50 bg-white" style={{ animation: 'fadein 0.06s ease' }} />}
 
       {toast && (
-        <div className={`absolute top-16 left-1/2 z-50 -translate-x-1/2 rounded-2xl px-5 py-3 text-sm font-medium shadow-lg animate-slideup ${
+        <div role="status" aria-live="polite" className={`camera-toast absolute left-1/2 z-50 -translate-x-1/2 rounded-2xl px-5 py-3 text-sm font-medium shadow-lg animate-slideup ${
           toast.type === 'error' ? 'bg-red-500/90 text-white' : 'bg-cream text-ink'}`}>
           {toast.msg}
         </div>
       )}
 
       {/* Top bar */}
-      <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between px-5 pt-4">
+      <div className="camera-bar safe-top absolute inset-x-0 top-0 z-20 flex items-center justify-between px-5">
         <span className="film-counter text-cream/70">{clock}</span>
         <div className="flex items-center gap-2">
           {queue.pending > 0 && (
@@ -379,18 +374,26 @@ export default function Camera() {
               {String(recordSecs).padStart(2, '0')}s / {MAX_VIDEO_SECONDS}s
             </span>
           )}
-          <Link to={`/e/${slug}/album`} className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/40 text-white/70 backdrop-blur-md transition hover:bg-black/60 hover:text-white">
+          <Link to={`/e/${slug}/album`} aria-label="Sair da câmera e abrir o álbum" className="icon-button border-white/15 bg-black/40 text-white/70 backdrop-blur-md hover:text-white">
             <X size={16} />
           </Link>
         </div>
       </div>
 
       {/* Viewfinder */}
-      <div className="relative flex-1 overflow-hidden bg-ink-deep">
+      <div className="camera-viewfinder relative flex-1 overflow-hidden bg-ink-deep">
         <video ref={videoRef} autoPlay playsInline muted
           className="h-full w-full object-cover"
           style={{ filter: activeFilter.css, transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
         />
+
+        {cameraError && (
+          <div className="absolute inset-x-6 top-1/2 z-10 -translate-y-1/2 rounded-3xl border border-white/10 bg-black/65 p-6 text-center backdrop-blur-xl" role="status">
+            <ImagePlus className="mx-auto h-6 w-6 text-gold" aria-hidden="true" />
+            <p className="mt-3 text-sm font-semibold text-cream">Câmera indisponível</p>
+            <p className="mt-1 text-xs leading-5 text-cream/55">Libere a câmera no navegador ou envie uma foto da galeria pelo botão abaixo.</p>
+          </div>
+        )}
 
         {/* Corner brackets */}
         <div className="pointer-events-none absolute inset-5">
@@ -401,7 +404,7 @@ export default function Camera() {
         </div>
 
         {/* Frame counter (motivo de filme) */}
-        <div className="absolute right-6 top-16 text-right">
+        <div className="camera-top-offset absolute right-6 text-right">
           <p className="label-mono text-gold/90">Frames</p>
           <p className="font-mono text-lg text-cream/90">
             {String(photoCount).padStart(2, '0')}
@@ -420,11 +423,11 @@ export default function Camera() {
       </div>
 
       {/* Filtros */}
-      <div className="border-t border-cream/[0.06] bg-ink-deep">
+      <div className="camera-filter-strip border-t border-cream/[0.06] bg-ink-deep">
         <div className="scrollbar-hide flex gap-2 overflow-x-auto px-5 py-3">
           {CAMERA_FILTERS.map((f) => (
-            <button key={f.id} onClick={() => setActiveFilter(f)}
-              className={`flex-shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-medium transition-all ${
+            <button key={f.id} type="button" aria-pressed={activeFilter.id === f.id} onClick={() => setActiveFilter(f)}
+              className={`min-h-11 flex-shrink-0 rounded-xl px-3.5 text-xs font-medium transition-all ${
                 activeFilter.id === f.id ? 'bg-gold text-ink' : 'border border-cream/15 text-cream/55 hover:text-cream/85'}`}
             >
               {f.label}
@@ -434,11 +437,11 @@ export default function Camera() {
       </div>
 
       {/* Seletor foto/vídeo */}
-      <div className="flex justify-center border-t border-cream/[0.06] bg-ink-deep pt-3">
+      <div className="camera-mode-switcher flex justify-center border-t border-cream/[0.06] bg-ink-deep pt-3">
         <div className="flex gap-1 rounded-full border border-cream/10 bg-cream/[0.04] p-1">
           {[{ id: 'photo', label: 'Foto' }, { id: 'video', label: `Vídeo ${MAX_VIDEO_SECONDS}s` }].map((m) => (
-            <button key={m.id} onClick={() => !recording && setMode(m.id)}
-              className={`rounded-full px-4 py-1 text-xs font-medium transition ${
+            <button key={m.id} type="button" aria-pressed={mode === m.id} onClick={() => !recording && setMode(m.id)}
+              className={`min-h-11 rounded-full px-4 text-xs font-medium transition ${
                 mode === m.id ? 'bg-gold text-ink' : 'text-cream/50 hover:text-cream/80'}`}>
               {m.label}
             </button>
@@ -447,20 +450,20 @@ export default function Camera() {
       </div>
 
       {/* Controles */}
-      <div className="flex items-center justify-between bg-ink-deep px-10 py-5">
-        <button onClick={() => fileRef.current?.click()} disabled={recording}
+      <div className="camera-controls safe-bottom flex items-center justify-between bg-ink-deep px-8 pt-5 sm:px-10">
+        <button type="button" aria-label="Escolher foto da galeria" onClick={() => fileRef.current?.click()} disabled={recording}
           className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/15 bg-white/[0.04] text-white/60 transition hover:bg-white/[0.08] hover:text-white disabled:opacity-30">
           <ImagePlus size={21} strokeWidth={1.7} />
         </button>
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
 
         {mode === 'photo' ? (
-          <button onClick={capturePhoto} disabled={remaining <= 0}
+          <button type="button" aria-label="Tirar foto" onClick={capturePhoto} disabled={remaining <= 0 || cameraError}
             className="relative flex h-20 w-20 items-center justify-center rounded-full border-4 border-cream/30 transition active:scale-95 disabled:opacity-30">
             <span className="h-14 w-14 rounded-full bg-cream" />
           </button>
         ) : (
-          <button onClick={recording ? stopRecording : startRecording} disabled={remaining <= 0}
+          <button type="button" aria-label={recording ? 'Parar gravação' : 'Gravar vídeo'} onClick={recording ? stopRecording : startRecording} disabled={remaining <= 0 || cameraError}
             className={`relative flex h-20 w-20 items-center justify-center rounded-full border-4 transition active:scale-95 disabled:opacity-30 ${
               recording ? 'border-red-400/70' : 'border-cream/30'}`}>
             <span className={`transition-all ${recording
@@ -469,7 +472,7 @@ export default function Camera() {
           </button>
         )}
 
-        <button onClick={flipCamera} disabled={recording}
+        <button type="button" aria-label="Alternar câmera" onClick={flipCamera} disabled={recording || cameraError}
           className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/15 bg-white/[0.04] text-white/60 transition hover:bg-white/[0.08] hover:text-white disabled:opacity-30">
           <SwitchCamera size={21} strokeWidth={1.7} />
         </button>

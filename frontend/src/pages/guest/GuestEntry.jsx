@@ -3,6 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Aperture, Users, Image as ImageIcon, ArrowRight, Camera, LayoutDashboard } from 'lucide-react';
 import { guestApi } from '../../api/guestApi';
 import { useAuth } from '../../contexts/AuthContext.jsx';
+import PageLoader from '../../components/ui/PageLoader';
+import Brand from '../../components/ui/Brand';
 
 function hexToRgba(hex, a = 1) {
   if (!hex) return null;
@@ -18,17 +20,9 @@ const TYPE_LABEL = {
   corporativo: 'Corporativo', viagem: 'Viagem', outro: 'Evento',
 };
 
-function Loader() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-ink-deep">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-cream/15 border-t-cream/60" />
-    </div>
-  );
-}
-
 function NotFound() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-ink-deep px-6 text-center text-cream">
+    <div className="app-screen flex flex-col items-center justify-center bg-ink-deep px-6 text-center text-cream">
       <p className="mb-3 font-serif text-3xl font-semibold tracking-tight">Evento não encontrado</p>
       <p className="text-sm text-cream-dim">O link pode estar errado ou o evento foi removido.</p>
     </div>
@@ -79,11 +73,11 @@ function ConviteEntry({
   const ink = '#2b241a';
 
   return (
-    <div className="flex min-h-screen flex-col items-center overflow-x-hidden bg-[#f2ead9] px-5 py-8 sm:py-12" style={{ color: ink }}>
+    <div className="app-screen flex flex-col items-center overflow-x-hidden bg-[#f2ead9] px-5 py-8 sm:py-12" style={{ color: ink }}>
       <div className="w-full max-w-sm animate-slideup text-center">
         {/* Marca */}
-        <p className="font-serif text-lg italic" style={{ color: `${ink}B3` }}>
-          Clique Junto<span style={{ color: accent }}>.</span>
+        <p className="font-serif text-lg font-semibold" style={{ color: `${ink}B3` }}>
+          <span className="mr-1.5" style={{ color: accent }}>✱</span>Clique Junto
         </p>
 
         {/* Pilha de polaroids — leque orgânico; com 3 fotos a principal centraliza
@@ -156,28 +150,28 @@ function ConviteEntry({
           </div>
         ) : (
           <form onSubmit={handleJoin} className="mt-8 text-left">
-            <label className="mb-2 block font-mono text-[10px] font-semibold uppercase tracking-[0.25em]" style={{ color: `${ink}80` }}>
+            <label htmlFor="invite-nickname" className="mb-2 block font-mono text-[10px] font-semibold uppercase tracking-[0.25em]" style={{ color: `${ink}80` }}>
               Seu nome
             </label>
             <input
-              type="text" value={nickname} onChange={(e) => setNickname(e.target.value)}
+              id="invite-nickname" type="text" value={nickname} onChange={(e) => setNickname(e.target.value)}
               placeholder="Como te chamam na festa?" maxLength={40}
               className="w-full rounded-xl border bg-white/70 px-4 py-3.5 text-[15px] outline-none transition placeholder:text-[#2b241a]/35 focus:bg-white"
               style={{ borderColor: `${ink}26`, color: ink }}
             />
 
-            <label className="mb-2 mt-4 block font-mono text-[10px] font-semibold uppercase tracking-[0.25em]" style={{ color: `${ink}80` }}>
+            <label htmlFor="invite-email" className="mb-2 mt-4 block font-mono text-[10px] font-semibold uppercase tracking-[0.25em]" style={{ color: `${ink}80` }}>
               Email <span className="normal-case tracking-normal" style={{ color: `${ink}59` }}>(opcional, para avisar da revelação)</span>
             </label>
             <input
-              type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+              id="invite-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email"
               placeholder="voce@email.com"
               className="w-full rounded-xl border bg-white/70 px-4 py-3.5 text-[15px] outline-none transition placeholder:text-[#2b241a]/35 focus:bg-white"
               style={{ borderColor: `${ink}26`, color: ink }}
             />
 
             {error && (
-              <p className="mt-3 rounded-xl px-4 py-2.5 text-sm" style={{ background: `${accent}1A`, color: accent }}>{error}</p>
+              <p role="alert" className="mt-3 rounded-xl px-4 py-2.5 text-sm" style={{ background: `${accent}1A`, color: accent }}>{error}</p>
             )}
 
             <button type="submit" disabled={joining}
@@ -215,7 +209,7 @@ function ConviteEntry({
 
         {!isClosed && (
           <Link to={`/e/${slug}/album`}
-            className="mt-4 inline-flex items-center gap-1 text-sm font-medium underline-offset-4 transition hover:underline"
+            className="mt-4 inline-flex min-h-11 items-center gap-1 px-2 text-sm font-medium underline-offset-4 transition hover:underline"
             style={{ color: `${ink}99` }}>
             Ver álbum <ArrowRight size={13} />
           </Link>
@@ -276,7 +270,7 @@ export default function GuestEntry() {
     }
   }
 
-  if (loading) return <Loader />;
+  if (loading) return <PageLoader label="Carregando convite" />;
   if (notFound) return <NotFound />;
 
   const isClosed = event?.status === 'closed' || event?.status === 'revealed';
@@ -302,7 +296,7 @@ export default function GuestEntry() {
     : undefined;
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-ink-deep px-4 py-8 sm:px-6 sm:py-10">
+    <div className="app-screen relative flex flex-col items-center justify-center overflow-x-hidden bg-ink-deep px-4 py-8 sm:px-6 sm:py-10">
       {/* Capa personalizada do evento (fundo) */}
       {cover && (
         <div className="pointer-events-none absolute inset-0">
@@ -328,12 +322,7 @@ export default function GuestEntry() {
             <img src={logo} alt={event?.name || 'logo'} className="h-14 w-14 rounded-full object-cover ring-2 ring-white/15" />
           ) : (
             <>
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-gold/25 bg-gold/[0.08]">
-                <Aperture size={17} className="text-gold" />
-              </span>
-              <Link to="/" className="font-serif text-xl font-semibold tracking-tight text-cream">
-                Clique Junto
-              </Link>
+              <Brand to="/" />
             </>
           )}
         </div>
@@ -344,14 +333,14 @@ export default function GuestEntry() {
             <p className="text-xs leading-relaxed text-cream-dim">
               Esta é a tela que seus convidados veem. Você pode entrar para testar — ou gerenciar o evento no painel.
             </p>
-            <Link to="/dashboard" className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-gold/25 bg-gold/[0.08] px-3 py-1.5 text-xs font-medium text-gold transition hover:border-gold/45">
+            <Link to="/dashboard" className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-gold/25 bg-gold/[0.08] px-3 text-xs font-medium text-gold transition hover:border-gold/45">
               <LayoutDashboard size={12} />
               Painel
             </Link>
           </div>
         )}
 
-        <div className="card p-6 sm:p-8">
+        <div className="card p-5 sm:p-8">
           <div className="mb-7 text-center">
             <p className="label-mono mb-3">{TYPE_LABEL[event?.type] || 'Evento'}</p>
             <h1 className="break-words font-serif text-3xl font-semibold leading-tight tracking-tight text-cream sm:text-4xl">{event?.name}</h1>
@@ -388,21 +377,21 @@ export default function GuestEntry() {
           ) : (
             <form onSubmit={handleJoin} className="space-y-4">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-cream-dim">Seu nome</label>
-                <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)}
+                <label htmlFor="guest-nickname" className="mb-1.5 block text-sm font-medium text-cream-dim">Seu nome</label>
+                <input id="guest-nickname" type="text" value={nickname} onChange={(e) => setNickname(e.target.value)}
                   placeholder="Como quer ser chamado?" className="input-field" maxLength={40} autoFocus />
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-cream-dim">
+                <label htmlFor="guest-email" className="mb-1.5 block text-sm font-medium text-cream-dim">
                   Email <span className="font-normal text-cream-dim/60">(opcional)</span>
                 </label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                <input id="guest-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email"
                   placeholder="para ser avisado quando o álbum revelar" className="input-field" />
               </div>
 
               {error && (
-                <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">{error}</p>
+                <p role="alert" className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">{error}</p>
               )}
 
               <button type="submit" disabled={joining} style={accentBtn}
@@ -428,7 +417,7 @@ export default function GuestEntry() {
               <p className="text-center font-mono text-[10px] uppercase tracking-label text-cream-dim/60">
                 Sem cadastro · Sem download · No navegador
               </p>
-              <Link to={`/e/${slug}/album`} className="group flex items-center justify-center gap-1 text-sm text-cream-dim transition hover:text-cream">
+              <Link to={`/e/${slug}/album`} className="group flex min-h-11 items-center justify-center gap-1 text-sm text-cream-dim transition hover:text-cream">
                 Ver álbum
                 <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
               </Link>

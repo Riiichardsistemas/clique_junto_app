@@ -1,4 +1,5 @@
 import api from './axios';
+import { API_BASE_URL } from './config';
 
 export const eventApi = {
   list: () => api.get('/events').then((r) => r.data),
@@ -25,12 +26,6 @@ export const eventApi = {
   // ZIP de todas as fotos (organizador) — modo local
   downloadZip: (id) =>
     api.get(`/photos/event/${id}/download`, { responseType: 'blob' }).then((r) => r.data),
-  qrCodeUrl: (id) => {
-    const base = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
-    return `${base}/events/${id}/qrcode`;
-  },
-  tableSignUrl: (id) => {
-    const base = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
-    return `${base}/events/${id}/table-sign`;
-  },
+  qrCodeUrl: (id) => `${API_BASE_URL}/events/${id}/qrcode`,
+  tableSignUrl: (id) => `${API_BASE_URL}/events/${id}/table-sign`,
 };

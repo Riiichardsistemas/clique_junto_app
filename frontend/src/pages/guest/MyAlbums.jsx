@@ -35,7 +35,14 @@ function AlbumCard({ event }) {
     >
       {/* Capa quadrada */}
       <div className="relative aspect-square w-full overflow-hidden rounded-glass border border-line bg-surface shadow-card transition-all duration-250 group-hover:scale-[1.02] group-hover:border-gold/40">
-        {revealed ? (
+        {revealed && event.coverImageUrl ? (
+          <img
+            src={event.coverImageUrl}
+            alt=""
+            loading="lazy"
+            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+          />
+        ) : revealed ? (
           <div className="flex h-full w-full items-center justify-center bg-cream/[0.04]">
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none"
               stroke="rgba(196,169,108,0.45)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
@@ -114,11 +121,11 @@ export default function MyAlbums() {
   const others   = (events || []).filter((e) => e.status !== 'revealed' && e.status !== 'active');
 
   return (
-    <div className="min-h-screen pb-16 text-cream">
+    <div className="app-shell text-cream">
       <AppHeader />
       <header className="mx-auto max-w-6xl px-4 pb-2 pt-7 sm:px-6 sm:pt-10">
         <p className="label-mono mb-2">Suas memórias</p>
-        <h1 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl md:text-[42px]">Álbuns</h1>
+        <h1 className="text-gradient font-serif text-3xl font-semibold tracking-tight sm:text-4xl md:text-[42px]">Álbuns</h1>
         <p className="mt-2 text-sm text-cream-dim">
           Abra o álbum de fotos de qualquer evento seu — revelado ou em andamento.
         </p>

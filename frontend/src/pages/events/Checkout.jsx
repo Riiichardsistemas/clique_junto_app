@@ -7,16 +7,9 @@ import {
 import { paymentApi } from '../../api/paymentApi';
 import { eventApi } from '../../api/eventApi';
 import { getPlan, formatBRL } from '../../utils/plans';
+import PageLoader from '../../components/ui/PageLoader';
 
 const onlyDigits = (v) => String(v || '').replace(/\D/g, '');
-
-function Loader() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-ink">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-cream/15 border-t-cream/60" />
-    </div>
-  );
-}
 
 export default function Checkout() {
   const { id } = useParams();
@@ -45,12 +38,12 @@ export default function Checkout() {
     setTimeout(() => navigate(`/events/${id}`), 1400);
   }
 
-  if (loading) return <Loader />;
+  if (loading) return <PageLoader label="Carregando pagamento" />;
 
   return (
-    <div className="min-h-screen text-cream">
-      <header className="glass sticky top-0 z-10">
-        <div className="mx-auto flex max-w-lg items-center justify-between px-6 py-3.5">
+    <div className="app-screen text-cream">
+      <header className="app-topbar glass sticky top-0 z-20">
+        <div className="mx-auto flex min-h-[56px] max-w-lg items-center justify-between px-4 sm:px-6">
           <Link to={`/events/${id}`} className="inline-flex items-center gap-1 text-sm text-cream-dim transition hover:text-cream">
             <ArrowLeft size={16} /> Voltar ao evento
           </Link>
@@ -79,7 +72,7 @@ export default function Checkout() {
             {!method && (
               <div className="animate-fadein space-y-3">
                 <p className="mb-1 text-sm text-cream-dim">Escolha como pagar:</p>
-                <button onClick={() => setMethod('pix')}
+                <button type="button" onClick={() => setMethod('pix')}
                   className="card card-hover flex w-full items-center gap-4 p-5 text-left">
                   <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-gold/25 bg-gold/10">
                     <QrCode className="h-5 w-5 text-gold" />
@@ -90,7 +83,7 @@ export default function Checkout() {
                   </span>
                   <ChevronLeft className="h-4 w-4 rotate-180 text-cream-dim" />
                 </button>
-                <button onClick={() => setMethod('card')}
+                <button type="button" onClick={() => setMethod('card')}
                   className="card card-hover flex w-full items-center gap-4 p-5 text-left">
                   <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-gold/25 bg-gold/10">
                     <CreditCard className="h-5 w-5 text-gold" />
@@ -166,7 +159,7 @@ function PixPanel({ eventId, planId, onBack, onPaid }) {
 
   return (
     <div className="card animate-fadein p-5 sm:p-6">
-      <button onClick={onBack} className="mb-4 inline-flex items-center gap-1 text-sm text-cream-dim hover:text-cream">
+      <button type="button" onClick={onBack} className="mb-4 inline-flex min-h-11 items-center gap-1 text-sm text-cream-dim hover:text-cream">
         <ChevronLeft size={15} /> Outros métodos
       </button>
       <h3 className="text-lg font-semibold">Pague com Pix</h3>
@@ -186,15 +179,15 @@ function PixPanel({ eventId, planId, onBack, onPaid }) {
           <p className="mt-4 text-center text-sm text-cream-dim">Escaneie o QR no app do seu banco ou copie o código:</p>
           {pix?.payload && (
             <div className="mt-2 flex gap-2">
-              <input readOnly value={pix.payload} className="input-field flex-1 text-xs" onFocus={(e) => e.target.select()} />
-              <button onClick={copyCode} className="btn-ghost btn-sm shrink-0"><Copy size={14} /></button>
+              <input readOnly value={pix.payload} aria-label="Código Pix copia e cola" className="input-field flex-1 text-xs" onFocus={(e) => e.target.select()} />
+              <button type="button" onClick={copyCode} aria-label="Copiar código Pix" className="btn-ghost btn-sm shrink-0"><Copy size={14} /></button>
             </div>
           )}
           <p className="mt-4 flex items-center justify-center gap-2 text-xs text-cream-dim">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Aguardando confirmação do pagamento…
           </p>
           {isMock && (
-            <button onClick={simulate} disabled={confirming} className="btn-primary mt-4 w-full">
+            <button type="button" onClick={simulate} disabled={confirming} className="btn-primary mt-4 w-full">
               {confirming ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Simular pagamento aprovado (teste)'}
             </button>
           )}
@@ -244,24 +237,24 @@ function CardPanel({ eventId, planId, onBack, onPaid }) {
 
       <div>
         <label className="mb-1 block text-xs text-cream-dim">Nome impresso no cartão</label>
-        <input className={inp} value={f.holderName} onChange={(e) => set('holderName', e.target.value)} placeholder="NOME COMPLETO" required />
+        <input aria-label="Nome impresso no cartão" className={inp} value={f.holderName} onChange={(e) => set('holderName', e.target.value)} placeholder="NOME COMPLETO" autoComplete="cc-name" required />
       </div>
       <div>
         <label className="mb-1 block text-xs text-cream-dim">Número do cartão</label>
-        <input className={inp} value={f.number} inputMode="numeric" maxLength={19}
+        <input aria-label="Número do cartão" className={inp} value={f.number} inputMode="numeric" maxLength={19} autoComplete="cc-number"
           onChange={(e) => set('number', onlyDigits(e.target.value).replace(/(.{4})/g, '$1 ').trim())}
           placeholder="0000 0000 0000 0000" required />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-xs text-cream-dim">Validade (MM/AA)</label>
-          <input className={inp} value={f.expiry} inputMode="numeric" maxLength={5}
+          <input aria-label="Validade do cartão" className={inp} value={f.expiry} inputMode="numeric" maxLength={5} autoComplete="cc-exp"
             onChange={(e) => { let v = onlyDigits(e.target.value).slice(0, 4); if (v.length >= 3) v = v.slice(0, 2) + '/' + v.slice(2); set('expiry', v); }}
             placeholder="MM/AA" required />
         </div>
         <div>
           <label className="mb-1 block text-xs text-cream-dim">CVV</label>
-          <input className={inp} value={f.ccv} inputMode="numeric" maxLength={4}
+          <input aria-label="Código de segurança do cartão" className={inp} value={f.ccv} inputMode="numeric" maxLength={4} autoComplete="cc-csc"
             onChange={(e) => set('ccv', onlyDigits(e.target.value))} placeholder="123" required />
         </div>
       </div>
@@ -269,13 +262,13 @@ function CardPanel({ eventId, planId, onBack, onPaid }) {
       <div className="border-t border-line/60 pt-3">
         <p className="mb-2 text-xs text-cream-dim">Dados do titular (exigidos pela operadora)</p>
         <div className="grid grid-cols-2 gap-3">
-          <input className={inp} value={f.cpfCnpj} inputMode="numeric" placeholder="CPF"
+          <input className={inp} value={f.cpfCnpj} inputMode="numeric" placeholder="CPF" aria-label="CPF do titular" autoComplete="off"
             onChange={(e) => set('cpfCnpj', onlyDigits(e.target.value))} required />
-          <input className={inp} value={f.phone} inputMode="numeric" placeholder="Celular (DDD+número)"
+          <input className={inp} value={f.phone} inputMode="numeric" placeholder="Celular (DDD+número)" aria-label="Celular do titular" autoComplete="tel"
             onChange={(e) => set('phone', onlyDigits(e.target.value))} required />
-          <input className={inp} value={f.postalCode} inputMode="numeric" placeholder="CEP"
+          <input className={inp} value={f.postalCode} inputMode="numeric" placeholder="CEP" aria-label="CEP do titular" autoComplete="postal-code"
             onChange={(e) => set('postalCode', onlyDigits(e.target.value))} required />
-          <input className={inp} value={f.addressNumber} placeholder="Nº do endereço"
+          <input className={inp} value={f.addressNumber} placeholder="Nº do endereço" aria-label="Número do endereço" autoComplete="address-line2"
             onChange={(e) => set('addressNumber', e.target.value)} required />
         </div>
       </div>

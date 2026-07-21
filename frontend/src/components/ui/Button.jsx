@@ -6,11 +6,23 @@ export default function Button({
   loading = false,
   disabled = false,
   className = '',
+  type,
   ...props
 }) {
-  const base = variant === 'primary' ? 'btn-primary' : 'btn-ghost';
+  const styles = {
+    primary: 'btn-primary',
+    ghost: 'btn-ghost',
+    danger: 'btn-danger-ghost',
+  };
+  const base = styles[variant] || styles.primary;
   return (
-    <button className={`${base} ${className}`} disabled={disabled || loading} {...props}>
+    <button
+      type={type || 'button'}
+      className={`${base} ${className}`}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      {...props}
+    >
       {loading && <Spinner className="mr-2 h-4 w-4" />}
       {children}
     </button>

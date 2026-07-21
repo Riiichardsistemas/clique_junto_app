@@ -13,6 +13,8 @@ export default function FilterSelector({ value, onChange }) {
           <button
             key={f.id}
             type="button"
+            aria-pressed={selected}
+            aria-label={`Filtro ${f.label}`}
             onClick={() => onChange(f.id)}
             className={`group relative flex flex-col items-center gap-1.5 rounded-xl border p-2 transition-all duration-200 ${
               selected
@@ -26,7 +28,7 @@ export default function FilterSelector({ value, onChange }) {
             >
               <img
                 src={SAMPLE}
-                alt={f.label}
+                alt=""
                 className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                 style={{ filter: f.cssFilter }}
               />

@@ -14,7 +14,10 @@ const crypto = require('crypto');
  */
 
 const useS3 = !!process.env.AWS_BUCKET_NAME;
-const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads');
+const defaultUploadsDir = path.join(__dirname, '..', '..', 'uploads');
+const UPLOADS_DIR = path.resolve(
+  process.env.UPLOADS_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || defaultUploadsDir
+);
 
 if (!useS3 && !fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });

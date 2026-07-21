@@ -2,12 +2,13 @@ const express = require('express');
 const ctrl = require('../controllers/eventController');
 const { getQRCode, getTableSign } = require('../controllers/qrController');
 const authMiddleware = require('../middlewares/authMiddleware');
+const userOnlyMiddleware = require('../middlewares/userOnlyMiddleware');
 const { upload } = require('../middlewares/uploadMiddleware');
 
 const router = express.Router();
 
 // Todas as rotas de evento exigem organizador autenticado
-router.use(authMiddleware);
+router.use(authMiddleware, userOnlyMiddleware);
 
 router.get('/', ctrl.list);
 router.post('/', ctrl.create);

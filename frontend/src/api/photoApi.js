@@ -1,7 +1,9 @@
 import axios from 'axios';
 import { getGuestToken } from './guestApi';
+import api from './axios';
+import { API_BASE_URL } from './config';
 
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+const BASE = API_BASE_URL;
 
 function guestHeaders(slug) {
   const token = getGuestToken(slug);
@@ -54,10 +56,5 @@ export const photoApi = {
       .then((r) => r.data),
 
   /** Remove foto (organizador) — usa instância api com auth header */
-  remove: (photoId) => {
-    // Import dinâmico para evitar dependência circular
-    return import('./axios').then(({ default: api }) =>
-      api.delete(`/photos/${photoId}`).then((r) => r.data)
-    );
-  },
+  remove: (photoId) => api.delete(`/photos/${photoId}`).then((r) => r.data),
 };

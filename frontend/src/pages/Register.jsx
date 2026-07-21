@@ -23,9 +23,9 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      await register(form);
+      const user = await register(form);
       toast.success('Conta criada com sucesso!');
-      navigate('/dashboard', { replace: true });
+      navigate(user?.role === 'admin' ? '/admin' : '/dashboard', { replace: true });
     } catch (err) {
       toast.error(err.response?.data?.error || 'Não foi possível criar a conta.');
     } finally {
@@ -74,7 +74,7 @@ export default function Register() {
       </form>
       <p className="mt-6 text-center text-sm text-cream/55">
         Já tem conta?{' '}
-        <Link to="/login" className="text-gold hover:underline">
+        <Link to="/login" className="inline-flex min-h-11 min-w-11 items-center justify-center text-gold hover:underline">
           Entrar
         </Link>
       </p>

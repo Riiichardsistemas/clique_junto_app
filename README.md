@@ -1,80 +1,63 @@
-# CLIQUE JUNTO — Álbum colaborativo de fotos
+# CLIQUE JUNTO
 
-Plataforma web onde o organizador cria um evento, gera um QR Code, e os convidados
-fotografam pelo navegador. As fotos ficam bloqueadas até a data de revelação — como
-uma câmera descartável digital.
+SaaS de álbuns colaborativos para eventos. O organizador cria o evento e compartilha um
+QR Code; os convidados fotografam pelo navegador e o álbum é liberado na data definida.
 
-Stack: **Backend** Node.js + Express + Sequelize (SQLite no dev, PostgreSQL em produção) ·
-**Frontend** React + Vite + TailwindCSS. Autenticação do organizador via **JWT**.
+## Stack
 
----
+- Frontend: React, Vite e Tailwind CSS
+- Backend: Node.js, Express e Sequelize
+- Banco: SQLite em desenvolvimento e PostgreSQL em produção
+- Arquivos: armazenamento local no desenvolvimento; S3 ou Railway Volume em produção
+- Autenticação: JWT separado para organizadores e convidados
+- Integrações: Asaas para pagamentos e Resend/SMTP para e-mail
 
-## ✅ Etapa 1 concluída — Setup do projeto + Autenticação
+## Desenvolvimento local
 
-- Estrutura completa de backend e frontend
-- Banco: SQLite automático em desenvolvimento, PostgreSQL quando `DATABASE_URL` está definida
-- Model `User` com hash de senha (bcrypt)
-- Auth do organizador: **cadastro, login e sessão (GET /me)** com JWT
-- Frontend: páginas Landing, Login, Cadastro e Dashboard (placeholder) + rotas protegidas
-- Tema dark com destaque dourado, tipografia serifada (Playfair Display)
+### Backend
 
-Verificado: 11/11 testes automatizados de autenticação passando (cadastro, login,
-email duplicado, senha curta, senha errada, token ausente/inválido, rota protegida).
-
----
-
-## Como rodar
-
-### 1. Backend
-
-> ⚠️ Antes do primeiro `npm install`, **apague a pasta `backend/node_modules`** se ela
-> existir (foi deixada uma instalação parcial pelo ambiente de testes). No Windows:
-> apague `backend\node_modules` pelo Explorador de Arquivos.
-
-```bash
+```powershell
 cd backend
-copy .env.example .env   # no Windows (ou: cp .env.example .env)
+Copy-Item .env.example .env
 npm install
 npm run dev
 ```
 
-API em `http://localhost:4000`. Teste rápido: `http://localhost:4000/api/health`.
+A API fica em `http://localhost:4000/api` e o health check em
+`http://localhost:4000/api/health`. Sem `DATABASE_URL`, o SQLite é criado automaticamente.
 
-Em desenvolvimento, o banco SQLite é criado automaticamente em `backend/database.sqlite`.
-Para usar PostgreSQL, defina `DATABASE_URL` no `.env`.
+### Frontend
 
-### 2. Frontend
-
-```bash
+```powershell
 cd frontend
+Copy-Item .env.example .env
 npm install
 npm run dev
 ```
 
-App em `http://localhost:5173`. Crie uma conta em `/register` e acesse o painel.
+O app fica em `http://localhost:5173`.
 
----
+## Produção
 
-## Endpoints disponíveis (Etapa 1)
+O projeto está preparado para:
 
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| GET | `/api/health` | Status da API |
-| POST | `/api/auth/register` | Cadastro `{ name, email, password }` |
-| POST | `/api/auth/login` | Login `{ email, password }` |
-| GET | `/api/auth/me` | Usuário autenticado (header `Authorization: Bearer <token>`) |
+- backend e PostgreSQL no Railway;
+- frontend estático Vite na Vercel;
+- domínio público da API com CORS restrito ao frontend;
+- health check e reinício automático;
+- persistência de fotos via S3 ou Railway Volume;
+- rotas React funcionando ao abrir URLs diretamente na Vercel.
 
----
+Siga o passo a passo completo em [DEPLOY.md](./DEPLOY.md).
 
-## Próximas etapas
+## Comandos úteis
 
-2. ~~Autenticação~~ ✅ · 3. CRUD de eventos · 4. Upload (S3 / local) ·
-5. Sessão de convidados · 6. Câmera · 7. Delayed reveal (cron) · 8. Álbum ·
-9. QR Code · 10. Pagamentos (Stripe) · 11. Painel completo · 12. Vídeo recap ·
-13. Emails · 14. Landing final · 15. Testes/UX · 16. Deploy
+| Diretório | Comando | Finalidade |
+|---|---|---|
+| `backend` | `npm run dev` | API local com recarga automática |
+| `backend` | `npm start` | API em modo normal/produção |
+| `backend` | `npm run create-super-admin -- email nome` | cria ou atualiza o super-admin |
+| `frontend` | `npm run dev` | frontend local |
+| `frontend` | `npm run build` | build de produção |
 
-> Observação: Google OAuth foi previsto no model (`provider`, `googleId`) mas a
-> autenticação inicial usa email + senha (JWT), conforme a stack Express do projeto.
-# era_uma_vez_app
-# era_uma_vez_app
-# era_uma_vez_app
+Nunca versione `.env`, chaves de API, senhas ou URLs com credenciais.

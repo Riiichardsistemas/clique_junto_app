@@ -63,8 +63,9 @@ export default function QRCodeDisplay({ event }) {
 
       {/* Link */}
       <button
+        type="button"
         onClick={copyLink}
-        className="group flex max-w-full items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 transition hover:border-gold/40"
+        className="group flex min-h-11 max-w-full items-center gap-2 rounded-full border border-line bg-surface px-4 transition hover:border-gold/40"
         title="Copiar link"
       >
         <span className="truncate font-mono text-xs text-cream-dim group-hover:text-cream">
@@ -77,11 +78,11 @@ export default function QRCodeDisplay({ event }) {
 
       {/* Ações */}
       <div className="flex flex-wrap justify-center gap-2">
-        <button onClick={downloadQR} disabled={!blobUrl} className="btn-ghost px-4 py-2 text-sm disabled:opacity-40">
+        <button type="button" onClick={downloadQR} disabled={!blobUrl} className="btn-ghost px-4 py-2 text-sm disabled:opacity-40">
           <Download size={15} />
           Baixar QR
         </button>
-        <button onClick={shareWhatsApp} className="btn-primary px-4 py-2 text-sm">
+        <button type="button" onClick={shareWhatsApp} className="btn-primary px-4 py-2 text-sm">
           <Share2 size={15} />
           WhatsApp
         </button>

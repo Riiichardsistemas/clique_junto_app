@@ -2,6 +2,7 @@ const express = require('express');
 const ctrl = require('../controllers/photoController');
 const guestMiddleware = require('../middlewares/guestMiddleware');
 const authMiddleware = require('../middlewares/authMiddleware');
+const userOnlyMiddleware = require('../middlewares/userOnlyMiddleware');
 const { rawBody } = require('../middlewares/uploadMiddleware');
 const { uploadLimiter } = require('../middlewares/rateLimitMiddleware');
 
@@ -22,8 +23,8 @@ router.put('/storage/:key', express.raw({ type: '*/*', limit: '40mb' }), (req, r
 router.get('/event/:eventId', ctrl.listForEvent);
 
 // Organizador
-router.get('/event/:eventId/admin', authMiddleware, ctrl.listForEventAdmin);
-router.get('/event/:eventId/download', authMiddleware, ctrl.downloadZip);
-router.delete('/:id', authMiddleware, ctrl.remove);
+router.get('/event/:eventId/admin', authMiddleware, userOnlyMiddleware, ctrl.listForEventAdmin);
+router.get('/event/:eventId/download', authMiddleware, userOnlyMiddleware, ctrl.downloadZip);
+router.delete('/:id', authMiddleware, userOnlyMiddleware, ctrl.remove);
 
 module.exports = router;

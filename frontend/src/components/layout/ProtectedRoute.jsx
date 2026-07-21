@@ -1,21 +1,21 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
-import Spinner from '../ui/Spinner';
+import PageLoader from '../ui/PageLoader';
 
 export default function ProtectedRoute({ children }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-ink text-gold">
-        <Spinner className="h-8 w-8" />
-      </div>
-    );
+    return <PageLoader label="Verificando sua sessão" />;
   }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  if (user?.role === 'admin') {
+    return <Navigate to="/admin" replace />;
   }
 
   return children;

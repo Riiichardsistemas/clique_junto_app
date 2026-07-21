@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { LogOut } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { authApi } from '../api/authApi';
@@ -77,17 +79,18 @@ function PasswordField({ label, value, onChange, placeholder }) {
       <label className="mb-1.5 block text-[13px] text-cream-dim">{label}</label>
       <div className="relative">
         <input
+          aria-label={label}
           type={show ? 'text' : 'password'}
           className="input-field pr-11"
           value={value}
           onChange={onChange}
           placeholder={placeholder}
+          autoComplete={label === 'Senha atual' ? 'current-password' : 'new-password'}
         />
         <button
           type="button"
           onClick={() => setShow((s) => !s)}
-          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-cream-dim/70 transition-colors hover:text-cream"
-          tabIndex={-1}
+          className="icon-button absolute right-1 top-1/2 -translate-y-1/2 border-0 text-cream-dim/70 hover:text-cream"
           aria-label={show ? 'Ocultar senha' : 'Mostrar senha'}
         >
           <IconEye off={show} />
@@ -98,7 +101,8 @@ function PasswordField({ label, value, onChange, placeholder }) {
 }
 
 export default function AccountSettings() {
-  const { user, setUser } = useAuth();
+  const { user, setUser, logout } = useAuth();
+  const navigate = useNavigate();
 
   // Perfil
   const [name, setName] = useState(user?.name || '');
@@ -146,14 +150,19 @@ export default function AccountSettings() {
     }
   }
 
+  function handleLogout() {
+    logout();
+    navigate('/login', { replace: true });
+  }
+
   return (
-    <div className="min-h-screen text-cream">
+    <div className="app-shell text-cream">
       <AppHeader />
 
       <main className="mx-auto max-w-6xl px-4 py-7 animate-fadein sm:px-6 sm:py-10">
         {/* Cabeçalho — título serifado grande como no print */}
         <div className="mb-6 sm:mb-8">
-          <h1 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl md:text-[42px]">
+          <h1 className="text-gradient font-serif text-3xl font-semibold tracking-tight sm:text-4xl md:text-[42px]">
             Configurações da Conta
           </h1>
           <p className="mt-2 text-sm text-cream-dim">Gerencie seu perfil e segurança.</p>
@@ -167,9 +176,9 @@ export default function AccountSettings() {
                 <div
                   className="flex h-24 w-24 items-center justify-center rounded-full border font-serif text-3xl text-gold"
                   style={{
-                    borderColor: 'rgba(196,169,108,0.35)',
-                    background: 'radial-gradient(circle at 35% 30%, rgba(196,169,108,0.22), rgba(196,169,108,0.06))',
-                    boxShadow: '0 0 0 4px rgba(196,169,108,0.06), 0 16px 40px -18px rgba(196,169,108,0.4)',
+                    borderColor: 'rgba(210,173,120,0.35)',
+                    background: 'radial-gradient(circle at 35% 30%, rgba(210,173,120,0.22), rgba(210,173,120,0.06))',
+                    boxShadow: '0 0 0 4px rgba(210,173,120,0.06), 0 16px 40px -18px rgba(210,173,120,0.4)',
                   }}
                 >
                   {initial}
@@ -177,12 +186,12 @@ export default function AccountSettings() {
               </div>
               <div>
                 <label className="mb-1.5 block text-[13px] text-cream-dim">Nome</label>
-                <input className="input-field" value={name} onChange={(e) => setName(e.target.value)}
+                <input aria-label="Nome" className="input-field" value={name} onChange={(e) => setName(e.target.value)}
                   placeholder="Nome" maxLength={80} required />
               </div>
               <div>
                 <label className="mb-1.5 block text-[13px] text-cream-dim">Email</label>
-                <input type="email" className="input-field" value={email}
+                <input aria-label="Email" type="email" className="input-field" value={email}
                   onChange={(e) => setEmail(e.target.value)} placeholder="email@exemplo.com" required />
               </div>
               <button type="submit" disabled={profileSaving} className="btn-primary w-full">
@@ -233,6 +242,16 @@ export default function AccountSettings() {
               </div>
             </div>
           </Section>
+
+          <section className="card flex flex-col items-start justify-between gap-4 p-5 sm:flex-row sm:items-center sm:p-6 lg:col-span-3">
+            <div>
+              <h2 className="text-lg text-cream">Sessão</h2>
+              <p className="mt-1 text-sm text-cream-dim">Saia com segurança deste dispositivo.</p>
+            </div>
+            <button type="button" className="btn-danger-ghost mobile-full" onClick={handleLogout}>
+              <LogOut size={16} /> Encerrar sessão
+            </button>
+          </section>
         </div>
       </main>
     </div>

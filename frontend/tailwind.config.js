@@ -4,47 +4,47 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Dark Luxe — referência dos prints
-        ink:         '#141519', // fundo principal
-        'ink-deep':  '#0d0e11', // viewport profundo (câmera, lightbox)
-        surface:     'rgba(226,196,143,0.04)', // cards
-        'surface-2': 'rgba(226,196,143,0.06)',
-        'surface-3': 'rgba(226,196,143,0.08)',
-        line:        'rgba(226,196,143,0.14)', // bordas
-        // Texto
-        cream:       '#F5F1E8',
-        'cream-dim': '#A39C8E',
-        muted:       '#A39C8E',
-        // Dourado fosco dos prints
+        // Mesmo sistema cromático da landing, adaptado à densidade do app.
+        ink:         '#09090A',
+        'ink-deep':  '#060607',
+        surface:     '#121214',
+        'surface-2': '#18181B',
+        'surface-3': '#1D1C1E',
+        line:        '#FFFFFF17',
+        cream:       '#F7F3EB',
+        'cream-dim': '#AAA59C',
+        muted:       '#AAA59C',
         gold: {
-          DEFAULT: '#C4A96C',
-          light:   '#DFC891',
-          dark:    '#A98F58',
-          deep:    '#8A7345',
+          DEFAULT: '#D2AD78',
+          light:   '#EDD9B7',
+          dark:    '#AE8957',
+          deep:    '#8A6F43',
         },
+        blue: '#98D7F7',
+        focus: '#98D7F7',
         success: '#4ADE80',
         warning: '#FACC15',
         danger:  '#F87171',
       },
       fontFamily: {
-        serif: ['"Playfair Display"', 'Georgia', 'serif'], // títulos (prints)
-        sans:  ['Inter', '"SF Pro Display"', 'system-ui', 'sans-serif'],
+        serif: ['"Cormorant Garamond"', 'Georgia', 'serif'],
+        sans:  ['Manrope', '"SF Pro Display"', 'system-ui', 'sans-serif'],
         mono:  ['"JetBrains Mono"', '"SF Mono"', 'monospace'],
       },
       letterSpacing: {
         label: '0.18em',
       },
       borderRadius: {
-        glass: '16px',
+        glass: '24px',
       },
       transitionDuration: {
         250: '250ms',
       },
       boxShadow: {
-        card:  'inset 0 1px 0 rgba(255,255,255,0.05), 0 24px 60px -28px rgba(0,0,0,0.7)',
-        float: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 32px 80px -32px rgba(0,0,0,0.8)',
-        glow:  '0 0 0 1px rgba(196,169,108,0.25), 0 0 24px -6px rgba(196,169,108,0.35)',
-        btn:   '0 12px 32px -14px rgba(196,169,108,0.45)',
+        card:  'inset 0 1px 0 rgba(255,255,255,0.04), 0 24px 70px -34px rgba(0,0,0,0.85)',
+        float: 'inset 0 1px 0 rgba(255,255,255,0.07), 0 32px 90px -36px rgba(0,0,0,0.9)',
+        glow:  '0 0 0 1px rgba(210,173,120,0.22), 0 0 28px -8px rgba(210,173,120,0.32)',
+        btn:   '0 16px 38px -18px rgba(0,0,0,0.75)',
       },
     },
   },

@@ -3,19 +3,13 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { ChevronLeft, ChevronRight, Download, X, Camera } from 'lucide-react';
 import { eventApi } from '../../api/eventApi';
+import PageLoader from '../../components/ui/PageLoader';
+import useLightboxNavigation from '../../hooks/useLightboxNavigation';
 
 function extFromUrl(url, mediaType) {
   const m = String(url).split('?')[0].match(/\.(\w{2,5})$/);
   if (m) return `.${m[1].toLowerCase()}`;
   return mediaType === 'video' ? '.webm' : '.jpg';
-}
-
-function Loader() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-ink-deep">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-cream/15 border-t-cream/60" />
-    </div>
-  );
 }
 
 export default function EventAlbum() {
@@ -27,6 +21,8 @@ export default function EventAlbum() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [downloading, setDownloading] = useState(false);
+
+  useLightboxNavigation(selected, setSelected, photos.length);
 
   const load = useCallback(async () => {
     try {
@@ -84,15 +80,15 @@ export default function EventAlbum() {
     }
   }
 
-  if (loading) return <Loader />;
+  if (loading) return <PageLoader label="Carregando álbum do evento" />;
 
   const statusLabel = { draft: 'Rascunho', active: 'Ativo', closed: 'Encerrado', revealed: 'Revelado' };
 
   return (
-    <div className="min-h-screen bg-ink-deep text-cream">
+    <div className="app-screen bg-ink-deep text-cream">
       {/* Header — barra fina com voltar e chip de ID, como no print */}
-      <header className="sticky top-0 z-10 glass">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3.5">
+      <header className="app-topbar sticky top-0 z-20 glass">
+        <div className="mx-auto flex min-h-[56px] max-w-6xl items-center justify-between px-4 sm:px-5">
           <Link
             to={`/events/${id}`}
             className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[13px] text-cream-dim transition hover:text-cream"
@@ -201,16 +197,24 @@ export default function EventAlbum() {
       {selected !== null && (
         <div
           className="fixed inset-0 z-50 flex animate-fadein items-center justify-center bg-black/95 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Foto ${selected + 1} de ${photos.length}`}
           onClick={() => setSelected(null)}
         >
           <button
-            className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/60 transition hover:bg-white/10 hover:text-white"
+            type="button"
+            aria-label="Fechar foto"
+            className="safe-fixed-top icon-button absolute right-4 border-white/10 bg-white/[0.06] text-white/60 hover:text-white sm:right-5"
             onClick={() => setSelected(null)}
           >
             <X size={17} />
           </button>
           <button
-            className="absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/50 transition hover:bg-white/10 hover:text-white"
+            type="button"
+            aria-label="Foto anterior"
+            disabled={selected === 0}
+            className="icon-button absolute left-3 top-1/2 -translate-y-1/2 border-white/10 bg-white/[0.06] text-white/50 hover:text-white disabled:opacity-25"
             onClick={(e) => { e.stopPropagation(); setSelected((s) => Math.max(0, s - 1)); }}
           >
             <ChevronLeft size={19} />
@@ -223,26 +227,29 @@ export default function EventAlbum() {
               loop
               controls
               playsInline
-              className="max-h-[88vh] max-w-[92vw] rounded-2xl object-contain"
+              className="lightbox-media max-w-[92vw] rounded-2xl object-contain"
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
             <img
               src={photos[selected]?.url}
               alt="Foto"
-              className="max-h-[88vh] max-w-[92vw] rounded-2xl object-contain"
+              className="lightbox-media max-w-[92vw] rounded-2xl object-contain"
               onClick={(e) => e.stopPropagation()}
             />
           )}
 
           <button
-            className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/50 transition hover:bg-white/10 hover:text-white"
+            type="button"
+            aria-label="Próxima foto"
+            disabled={selected === photos.length - 1}
+            className="icon-button absolute right-3 top-1/2 -translate-y-1/2 border-white/10 bg-white/[0.06] text-white/50 hover:text-white disabled:opacity-25"
             onClick={(e) => { e.stopPropagation(); setSelected((s) => Math.min(photos.length - 1, s + 1)); }}
           >
             <ChevronRight size={19} />
           </button>
 
-          <div className="absolute bottom-5 left-1/2 flex w-max max-w-[92vw] -translate-x-1/2 items-center gap-3 rounded-full border border-white/10 bg-black/60 px-4 py-2 backdrop-blur-md">
+          <div className="safe-fixed-bottom absolute left-1/2 flex w-max max-w-[92vw] -translate-x-1/2 items-center gap-3 rounded-full border border-white/10 bg-black/60 px-4 py-2 backdrop-blur-md">
             <p className="film-counter truncate">
               {selected + 1} / {photos.length}
               {photos[selected]?.guestNickname && (
@@ -251,6 +258,7 @@ export default function EventAlbum() {
             </p>
             <span className="h-3 w-px bg-white/15" />
             <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); downloadOne(photos[selected], selected); }}
               className="inline-flex items-center gap-1 font-mono text-xs tracking-widest text-white/70 transition hover:text-white"
             >

@@ -1,126 +1,210 @@
 const { Op, fn, col } = require('sequelize');
-const { User, Event, Guest, Photo, Plan } = require('../models');
+const { User, Event, Guest, Photo, Plan, AdminAuditLog, sequelize } = require('../models');
 const { getPlan, formatBRL } = require('../config/plans');
+const { EVENT_STATUS } = require('../config/constants');
+const storage = require('../config/storage');
+const { sendMail } = require('../config/mailer');
+const templates = require('../utils/emailTemplates');
+const { recordAdminAction } = require('../services/adminAuditService');
 
-/**
- * Painel do super-admin: métricas de vendas e gestão de usuários/eventos.
- * Todas as rotas passam por authMiddleware + adminMiddleware.
- */
+function pagination(query, defaultLimit = 25) {
+  const limit = Math.min(Math.max(Number(query.limit) || defaultLimit, 1), 100);
+  const offset = Math.max(Number(query.offset) || 0, 0);
+  return { limit, offset };
+}
 
-// GET /api/admin/overview — KPIs gerais + série de vendas (30 dias)
+function organizerSummary(organizer) {
+  return organizer
+    ? { id: organizer.id, name: organizer.name, email: organizer.email }
+    : null;
+}
+
+async function eventUsage(eventId) {
+  const [guestCount, photoCount, mediaBytes] = await Promise.all([
+    Guest.count({ where: { eventId } }),
+    Photo.count({ where: { eventId } }),
+    Photo.sum('sizeBytes', { where: { eventId } }),
+  ]);
+  return { guestCount, photoCount, mediaBytes: Number(mediaBytes) || 0 };
+}
+
+async function serializeEvent(event) {
+  return {
+    id: event.id,
+    name: event.name,
+    slug: event.slug,
+    type: event.type,
+    status: event.status,
+    planId: event.planId,
+    maxGuests: event.maxGuests,
+    isPaid: event.isPaid,
+    pricePaidCents: event.pricePaidCents,
+    createdAt: event.createdAt,
+    startsAt: event.startsAt,
+    endsAt: event.endsAt,
+    revealAt: event.revealAt,
+    isPrivate: event.isPrivate,
+    liveWallEnabled: event.liveWallEnabled,
+    recapStatus: event.recapStatus,
+    organizer: organizerSummary(event.organizer),
+    ...(await eventUsage(event.id)),
+  };
+}
+
+// GET /api/admin/overview
 async function overview(req, res, next) {
   try {
-    const [totalUsers, totalEvents, totalGuests, totalPhotos] = await Promise.all([
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const [
+      totalUsers, activeUsers, adminCount, usersThisMonth,
+      totalEvents, eventsThisMonth, totalGuests, totalPhotos, totalMediaBytes,
+      pendingPayments, failedPayments, checkoutCount,
+    ] = await Promise.all([
       User.count(),
+      User.count({ where: { isActive: true } }),
+      User.count({ where: { role: 'admin', isActive: true } }),
+      User.count({ where: { createdAt: { [Op.gte]: monthStart } } }),
       Event.count(),
+      Event.count({ where: { createdAt: { [Op.gte]: monthStart } } }),
       Guest.count(),
       Photo.count(),
+      Photo.sum('sizeBytes'),
+      Plan.count({ where: { status: 'pending' } }),
+      Plan.count({ where: { status: 'failed' } }),
+      Plan.count(),
     ]);
 
-    // Eventos por status
     const statusRows = await Event.findAll({
       attributes: ['status', [fn('COUNT', col('id')), 'count']],
       group: ['status'],
       raw: true,
     });
-    const eventsByStatus = statusRows.reduce((acc, r) => {
-      acc[r.status] = Number(r.count);
+    const eventsByStatus = statusRows.reduce((acc, row) => {
+      acc[row.status] = Number(row.count);
       return acc;
     }, {});
 
-    // Todas as vendas pagas
     const paid = await Plan.findAll({ where: { status: 'paid' }, raw: true });
-    const revenueCents = paid.reduce((s, p) => s + (p.amountCents || 0), 0);
-    const salesCount = paid.length;
+    const revenueCents = paid.reduce((sum, payment) => sum + (payment.amountCents || 0), 0);
+    const paidThisMonth = paid.filter((payment) => new Date(payment.paidAt || payment.updatedAt) >= monthStart);
+    const revenueMonthCents = paidThisMonth.reduce((sum, payment) => sum + (payment.amountCents || 0), 0);
 
-    // Receita e vendas do mês corrente
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const paidThisMonth = paid.filter((p) => new Date(p.paidAt || p.updatedAt) >= monthStart);
-    const revenueMonthCents = paidThisMonth.reduce((s, p) => s + (p.amountCents || 0), 0);
-
-    // Série de vendas dos últimos 30 dias (bucket por dia, em JS = DB-agnóstico)
-    const days = 30;
     const buckets = {};
-    for (let i = days - 1; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(now.getDate() - i);
-      buckets[d.toISOString().slice(0, 10)] = { date: d.toISOString().slice(0, 10), sales: 0, revenueCents: 0 };
+    for (let index = 29; index >= 0; index -= 1) {
+      const date = new Date(now);
+      date.setDate(now.getDate() - index);
+      const key = date.toISOString().slice(0, 10);
+      buckets[key] = { date: key, sales: 0, revenueCents: 0 };
     }
-    paid.forEach((p) => {
-      const key = new Date(p.paidAt || p.updatedAt).toISOString().slice(0, 10);
-      if (buckets[key]) { buckets[key].sales += 1; buckets[key].revenueCents += p.amountCents || 0; }
+    paid.forEach((payment) => {
+      const key = new Date(payment.paidAt || payment.updatedAt).toISOString().slice(0, 10);
+      if (buckets[key]) {
+        buckets[key].sales += 1;
+        buckets[key].revenueCents += payment.amountCents || 0;
+      }
     });
-    const salesSeries = Object.values(buckets);
 
-    // Distribuição por plano (pagos)
-    const planDist = {};
-    paid.forEach((p) => {
-      planDist[p.planId] = planDist[p.planId] || { planId: p.planId, count: 0, revenueCents: 0 };
-      planDist[p.planId].count += 1;
-      planDist[p.planId].revenueCents += p.amountCents || 0;
+    const planMap = {};
+    paid.forEach((payment) => {
+      planMap[payment.planId] ||= { planId: payment.planId, count: 0, revenueCents: 0 };
+      planMap[payment.planId].count += 1;
+      planMap[payment.planId].revenueCents += payment.amountCents || 0;
     });
-    const planDistribution = Object.values(planDist)
-      .map((x) => ({ ...x, label: getPlan(x.planId)?.label || x.planId }))
+    const planDistribution = Object.values(planMap)
+      .map((item) => ({ ...item, label: getPlan(item.planId)?.label || item.planId }))
       .sort((a, b) => b.revenueCents - a.revenueCents);
 
-    // Últimas vendas
-    const recent = await Plan.findAll({
-      where: { status: 'paid' },
-      order: [['paidAt', 'DESC'], ['updatedAt', 'DESC']],
-      limit: 8,
-      include: [{ model: Event, as: 'event', attributes: ['id', 'name'], include: [{ model: User, as: 'organizer', attributes: ['id', 'name', 'email'] }] }],
-    });
-    const recentSales = recent.map((p) => ({
-      id: p.id,
-      planId: p.planId,
-      planLabel: getPlan(p.planId)?.label || p.planId,
-      amountCents: p.amountCents,
-      amount: formatBRL(p.amountCents),
-      billingType: p.billingType,
-      paidAt: p.paidAt || p.updatedAt,
-      eventName: p.event?.name || '—',
-      organizer: p.event?.organizer ? { name: p.event.organizer.name, email: p.event.organizer.email } : null,
-    }));
+    const [recent, recentAudit] = await Promise.all([
+      Plan.findAll({
+        where: { status: 'paid' },
+        order: [['paidAt', 'DESC'], ['updatedAt', 'DESC']],
+        limit: 6,
+        include: [{
+          model: Event,
+          as: 'event',
+          attributes: ['id', 'name'],
+          include: [{ model: User, as: 'organizer', attributes: ['id', 'name', 'email'] }],
+        }],
+      }),
+      AdminAuditLog.findAll({
+        order: [['createdAt', 'DESC']],
+        limit: 6,
+        include: [{ model: User, as: 'admin', attributes: ['id', 'name', 'email'] }],
+      }),
+    ]);
 
     res.json({
       kpis: {
         totalUsers,
+        activeUsers,
+        inactiveUsers: totalUsers - activeUsers,
+        adminCount,
+        usersThisMonth,
         totalEvents,
+        eventsThisMonth,
         totalGuests,
         totalPhotos,
-        salesCount,
+        totalMediaBytes: Number(totalMediaBytes) || 0,
+        pendingPayments,
+        failedPayments,
+        salesCount: paid.length,
         revenueCents,
         revenue: formatBRL(revenueCents),
         revenueMonthCents,
         revenueMonth: formatBRL(revenueMonthCents),
         salesThisMonth: paidThisMonth.length,
-        avgTicketCents: salesCount ? Math.round(revenueCents / salesCount) : 0,
-        avgTicket: formatBRL(salesCount ? Math.round(revenueCents / salesCount) : 0),
+        avgTicketCents: paid.length ? Math.round(revenueCents / paid.length) : 0,
+        avgTicket: formatBRL(paid.length ? Math.round(revenueCents / paid.length) : 0),
+        paymentConversionRate: checkoutCount ? Math.round((paid.length / checkoutCount) * 1000) / 10 : 0,
       },
       eventsByStatus,
-      salesSeries,
+      salesSeries: Object.values(buckets),
       planDistribution,
-      recentSales,
+      recentSales: recent.map((payment) => ({
+        id: payment.id,
+        planId: payment.planId,
+        planLabel: getPlan(payment.planId)?.label || payment.planId,
+        amountCents: payment.amountCents,
+        amount: formatBRL(payment.amountCents),
+        billingType: payment.billingType,
+        paidAt: payment.paidAt || payment.updatedAt,
+        eventName: payment.event?.name || '—',
+        organizer: organizerSummary(payment.event?.organizer),
+      })),
+      recentAudit: recentAudit.map((item) => ({
+        id: item.id,
+        action: item.action,
+        targetType: item.targetType,
+        targetId: item.targetId,
+        targetLabel: item.targetLabel,
+        createdAt: item.createdAt,
+        admin: organizerSummary(item.admin),
+      })),
     });
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 }
 
-// GET /api/admin/users — lista com busca e paginação
+// GET /api/admin/users
 async function listUsers(req, res, next) {
   try {
-    const search = (req.query.search || '').trim();
-    const limit = Math.min(Number(req.query.limit) || 25, 100);
-    const offset = Number(req.query.offset) || 0;
+    const search = String(req.query.search || '').trim();
+    const role = String(req.query.role || '').trim();
+    const status = String(req.query.status || '').trim();
+    const { limit, offset } = pagination(req.query);
+    const where = {};
 
-    const where = search
-      ? { [Op.or]: [
-          { name: { [Op.like]: `%${search}%` } },
-          { email: { [Op.like]: `%${search}%` } },
-        ] }
-      : {};
+    if (search) {
+      where[Op.or] = [
+        { name: { [Op.like]: `%${search}%` } },
+        { email: { [Op.like]: `%${search}%` } },
+      ];
+    }
+    if (['user', 'admin'].includes(role)) where.role = role;
+    if (status === 'active') where.isActive = true;
+    if (status === 'inactive') where.isActive = false;
 
     const { rows, count } = await User.findAndCountAll({
       where,
@@ -129,157 +213,446 @@ async function listUsers(req, res, next) {
       offset,
     });
 
-    const users = await Promise.all(rows.map(async (u) => {
+    const users = await Promise.all(rows.map(async (user) => {
       const [eventCount, paidPlans] = await Promise.all([
-        Event.count({ where: { userId: u.id } }),
+        Event.count({ where: { userId: user.id } }),
         Plan.findAll({
           where: { status: 'paid' },
-          include: [{ model: Event, as: 'event', attributes: [], where: { userId: u.id } }],
+          include: [{ model: Event, as: 'event', attributes: [], where: { userId: user.id } }],
           raw: true,
         }),
       ]);
-      const spentCents = paidPlans.reduce((s, p) => s + (p.amountCents || 0), 0);
+      const spentCents = paidPlans.reduce((sum, payment) => sum + (payment.amountCents || 0), 0);
       return {
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        role: u.role,
-        isActive: u.isActive,
-        createdAt: u.createdAt,
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
         eventCount,
         spentCents,
         spent: formatBRL(spentCents),
       };
     }));
 
-    res.json({ total: count, users });
-  } catch (err) {
-    next(err);
+    res.json({ total: count, limit, offset, users });
+  } catch (error) {
+    next(error);
   }
 }
 
-// GET /api/admin/users/:id — detalhe + eventos do usuário
+// GET /api/admin/users/:id
 async function getUser(req, res, next) {
   try {
     const user = await User.findByPk(req.params.id);
     if (!user) return res.status(404).json({ error: 'Usuario nao encontrado.' });
-    const events = await Event.findAll({
-      where: { userId: user.id },
-      order: [['createdAt', 'DESC']],
+
+    const rawEvents = await Event.findAll({ where: { userId: user.id }, order: [['createdAt', 'DESC']] });
+    const events = await Promise.all(rawEvents.map((event) => serializeEvent(event)));
+    const payments = await Plan.findAll({
+      where: { status: 'paid' },
+      include: [{ model: Event, as: 'event', attributes: ['id', 'name'], where: { userId: user.id } }],
+      order: [['paidAt', 'DESC'], ['createdAt', 'DESC']],
     });
-    res.json({ user: user.toJSON(), events });
-  } catch (err) {
-    next(err);
+    const spentCents = payments.reduce((sum, payment) => sum + (payment.amountCents || 0), 0);
+
+    return res.json({
+      user: user.toJSON(),
+      events,
+      summary: {
+        eventCount: events.length,
+        activeEventCount: events.filter((event) => event.status === 'active').length,
+        photoCount: events.reduce((sum, event) => sum + event.photoCount, 0),
+        guestCount: events.reduce((sum, event) => sum + event.guestCount, 0),
+        spentCents,
+        spent: formatBRL(spentCents),
+      },
+    });
+  } catch (error) {
+    return next(error);
   }
 }
 
-// PATCH /api/admin/users/:id — ativa/desativa ou muda role
+// PATCH /api/admin/users/:id
 async function updateUser(req, res, next) {
   try {
     const user = await User.findByPk(req.params.id);
     if (!user) return res.status(404).json({ error: 'Usuario nao encontrado.' });
 
-    // Proteção: não permitir que o admin remova o próprio acesso de admin
-    if (user.id === req.user.id && req.body.role && req.body.role !== 'admin') {
-      return res.status(400).json({ error: 'Voce nao pode remover seu proprio acesso de admin.' });
+    const wantsRoleChange = req.body.role !== undefined;
+    const wantsStatusChange = req.body.isActive !== undefined;
+    if (wantsRoleChange && !['user', 'admin'].includes(req.body.role)) {
+      return res.status(400).json({ error: 'Papel de usuario invalido.' });
+    }
+    if (wantsStatusChange && typeof req.body.isActive !== 'boolean') {
+      return res.status(400).json({ error: 'Status de usuario invalido.' });
     }
 
-    if (typeof req.body.isActive === 'boolean') user.isActive = req.body.isActive;
-    if (req.body.role && ['user', 'admin'].includes(req.body.role)) user.role = req.body.role;
+    const nextRole = wantsRoleChange ? req.body.role : user.role;
+    const nextActive = wantsStatusChange ? req.body.isActive : user.isActive;
+    if (user.id === req.user.id && (nextRole !== 'admin' || !nextActive)) {
+      return res.status(400).json({ error: 'Voce nao pode remover ou desativar seu proprio acesso de super admin.' });
+    }
+
+    const removesActiveAdmin = user.role === 'admin' && user.isActive && (nextRole !== 'admin' || !nextActive);
+    if (removesActiveAdmin) {
+      const activeAdmins = await User.count({ where: { role: 'admin', isActive: true } });
+      if (activeAdmins <= 1) {
+        return res.status(400).json({ error: 'O sistema precisa manter pelo menos um super admin ativo.' });
+      }
+    }
+
+    const changes = {};
+    if (nextRole !== user.role) changes.role = { from: user.role, to: nextRole };
+    if (nextActive !== user.isActive) changes.isActive = { from: user.isActive, to: nextActive };
+
+    user.role = nextRole;
+    user.isActive = nextActive;
     await user.save();
-    res.json({ user: user.toJSON() });
-  } catch (err) {
-    next(err);
+
+    if (Object.keys(changes).length) {
+      await recordAdminAction(req, {
+        action: 'user.updated',
+        targetType: 'user',
+        targetId: user.id,
+        targetLabel: `${user.name} (${user.email})`,
+        metadata: { changes },
+      });
+    }
+
+    return res.json({ user: user.toJSON() });
+  } catch (error) {
+    return next(error);
   }
 }
 
-// GET /api/admin/events — todos os eventos
+// GET /api/admin/events
 async function listEvents(req, res, next) {
   try {
-    const search = (req.query.search || '').trim();
-    const status = (req.query.status || '').trim();
-    const limit = Math.min(Number(req.query.limit) || 25, 100);
-    const offset = Number(req.query.offset) || 0;
-
+    const search = String(req.query.search || '').trim();
+    const status = String(req.query.status || '').trim();
+    const planId = String(req.query.planId || '').trim();
+    const { limit, offset } = pagination(req.query);
     const where = {};
-    if (search) where.name = { [Op.like]: `%${search}%` };
-    if (status) where.status = status;
+    if (search) {
+      where[Op.or] = [
+        { name: { [Op.like]: `%${search}%` } },
+        { slug: { [Op.like]: `%${search}%` } },
+        { '$organizer.name$': { [Op.like]: `%${search}%` } },
+        { '$organizer.email$': { [Op.like]: `%${search}%` } },
+      ];
+    }
+    if (Object.values(EVENT_STATUS).includes(status)) where.status = status;
+    if (planId) where.planId = planId;
 
     const { rows, count } = await Event.findAndCountAll({
       where,
       order: [['createdAt', 'DESC']],
       limit,
       offset,
+      distinct: true,
+      subQuery: false,
       include: [{ model: User, as: 'organizer', attributes: ['id', 'name', 'email'] }],
     });
-
-    const events = await Promise.all(rows.map(async (ev) => {
-      const [guestCount, photoCount] = await Promise.all([
-        Guest.count({ where: { eventId: ev.id } }),
-        Photo.count({ where: { eventId: ev.id } }),
-      ]);
-      return {
-        id: ev.id,
-        name: ev.name,
-        slug: ev.slug,
-        type: ev.type,
-        status: ev.status,
-        planId: ev.planId,
-        isPaid: ev.isPaid,
-        pricePaidCents: ev.pricePaidCents,
-        createdAt: ev.createdAt,
-        revealAt: ev.revealAt,
-        organizer: ev.organizer ? { id: ev.organizer.id, name: ev.organizer.name, email: ev.organizer.email } : null,
-        guestCount,
-        photoCount,
-      };
-    }));
-
-    res.json({ total: count, events });
-  } catch (err) {
-    next(err);
+    const events = await Promise.all(rows.map(serializeEvent));
+    res.json({ total: count, limit, offset, events });
+  } catch (error) {
+    next(error);
   }
 }
 
-// GET /api/admin/payments — todas as cobranças (vendas)
+// GET /api/admin/events/:id
+async function getEvent(req, res, next) {
+  try {
+    const event = await Event.findByPk(req.params.id, {
+      include: [{ model: User, as: 'organizer', attributes: ['id', 'name', 'email', 'isActive'] }],
+    });
+    if (!event) return res.status(404).json({ error: 'Evento nao encontrado.' });
+    const payments = await Plan.findAll({ where: { eventId: event.id }, order: [['createdAt', 'DESC']] });
+    return res.json({
+      event: await serializeEvent(event),
+      payments: payments.map((payment) => ({
+        id: payment.id,
+        status: payment.status,
+        provider: payment.provider,
+        billingType: payment.billingType,
+        amountCents: payment.amountCents,
+        amount: formatBRL(payment.amountCents),
+        createdAt: payment.createdAt,
+        paidAt: payment.paidAt,
+      })),
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function loadAdminEvent(req, res) {
+  const event = await Event.findByPk(req.params.id);
+  if (!event) {
+    res.status(404).json({ error: 'Evento nao encontrado.' });
+    return null;
+  }
+  return event;
+}
+
+// POST /api/admin/events/:id/close
+async function closeEvent(req, res, next) {
+  try {
+    const event = await loadAdminEvent(req, res);
+    if (!event) return;
+    if (event.status === EVENT_STATUS.REVEALED) {
+      return res.status(400).json({ error: 'Um evento revelado nao pode ser encerrado novamente.' });
+    }
+    const previousStatus = event.status;
+    event.status = EVENT_STATUS.CLOSED;
+    event.endsAt = new Date();
+    await event.save();
+    await recordAdminAction(req, {
+      action: 'event.closed',
+      targetType: 'event',
+      targetId: event.id,
+      targetLabel: event.name,
+      metadata: { previousStatus },
+    });
+    return res.json({ event: await serializeEvent(event) });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+// POST /api/admin/events/:id/reveal
+async function revealEvent(req, res, next) {
+  try {
+    const event = await loadAdminEvent(req, res);
+    if (!event) return;
+    const previousStatus = event.status;
+    await Photo.update({ isVisible: true }, { where: { eventId: event.id } });
+    event.status = EVENT_STATUS.REVEALED;
+    event.revealAt = new Date();
+    await event.save();
+    await recordAdminAction(req, {
+      action: 'event.revealed',
+      targetType: 'event',
+      targetId: event.id,
+      targetLabel: event.name,
+      metadata: { previousStatus },
+    });
+
+    const base = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0];
+    const albumUrl = `${base}/e/${event.slug}/album`;
+    Guest.findAll({ where: { eventId: event.id, email: { [Op.not]: null } } })
+      .then((guests) => Promise.all(guests.map((guest) => sendMail({
+        to: guest.email,
+        ...templates.guestAlbumReady(guest.nickname || 'convidado', event.name, albumUrl),
+      }).catch(() => {}))))
+      .catch(() => {});
+
+    return res.json({ event: await serializeEvent(event), message: 'Album revelado.' });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+// DELETE /api/admin/events/:id
+async function deleteEvent(req, res, next) {
+  try {
+    const event = await loadAdminEvent(req, res);
+    if (!event) return;
+    const usage = await eventUsage(event.id);
+    const photos = await Photo.findAll({ where: { eventId: event.id } });
+    await Promise.all(photos.flatMap((photo) => [
+      storage.remove(photo.storageKey).catch(() => {}),
+      photo.thumbKey ? storage.remove(photo.thumbKey).catch(() => {}) : null,
+    ].filter(Boolean)));
+
+    await Promise.all([
+      Photo.destroy({ where: { eventId: event.id } }),
+      Guest.destroy({ where: { eventId: event.id } }),
+      Plan.destroy({ where: { eventId: event.id } }),
+    ]);
+    await event.destroy();
+    await recordAdminAction(req, {
+      action: 'event.deleted',
+      targetType: 'event',
+      targetId: event.id,
+      targetLabel: event.name,
+      metadata: { status: event.status, ...usage },
+    });
+    return res.json({ ok: true });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+// GET /api/admin/payments
 async function listPayments(req, res, next) {
   try {
-    const status = (req.query.status || '').trim();
-    const limit = Math.min(Number(req.query.limit) || 25, 100);
-    const offset = Number(req.query.offset) || 0;
-
+    const search = String(req.query.search || '').trim();
+    const status = String(req.query.status || '').trim();
+    const { limit, offset } = pagination(req.query);
     const where = {};
-    if (status) where.status = status;
+    if (['pending', 'paid', 'failed', 'refunded'].includes(status)) where.status = status;
+    if (search) {
+      where[Op.or] = [
+        { providerPaymentId: { [Op.like]: `%${search}%` } },
+        { '$event.name$': { [Op.like]: `%${search}%` } },
+        { '$event.organizer.name$': { [Op.like]: `%${search}%` } },
+        { '$event.organizer.email$': { [Op.like]: `%${search}%` } },
+      ];
+    }
 
     const { rows, count } = await Plan.findAndCountAll({
       where,
       order: [['createdAt', 'DESC']],
       limit,
       offset,
-      include: [{ model: Event, as: 'event', attributes: ['id', 'name'], include: [{ model: User, as: 'organizer', attributes: ['id', 'name', 'email'] }] }],
+      distinct: true,
+      subQuery: false,
+      include: [{
+        model: Event,
+        as: 'event',
+        attributes: ['id', 'name'],
+        include: [{ model: User, as: 'organizer', attributes: ['id', 'name', 'email'] }],
+      }],
     });
 
-    const payments = rows.map((p) => ({
-      id: p.id,
-      planId: p.planId,
-      planLabel: getPlan(p.planId)?.label || p.planId,
-      amountCents: p.amountCents,
-      amount: formatBRL(p.amountCents),
-      provider: p.provider,
-      status: p.status,
-      billingType: p.billingType,
-      createdAt: p.createdAt,
-      paidAt: p.paidAt,
-      invoiceUrl: p.invoiceUrl,
-      eventName: p.event?.name || '—',
-      eventId: p.event?.id || null,
-      organizer: p.event?.organizer ? { name: p.event.organizer.name, email: p.event.organizer.email } : null,
+    const payments = rows.map((payment) => ({
+      id: payment.id,
+      providerPaymentId: payment.providerPaymentId,
+      planId: payment.planId,
+      planLabel: getPlan(payment.planId)?.label || payment.planId,
+      amountCents: payment.amountCents,
+      amount: formatBRL(payment.amountCents),
+      provider: payment.provider,
+      status: payment.status,
+      billingType: payment.billingType,
+      createdAt: payment.createdAt,
+      paidAt: payment.paidAt,
+      invoiceUrl: payment.invoiceUrl,
+      eventName: payment.event?.name || '—',
+      eventId: payment.event?.id || null,
+      organizer: organizerSummary(payment.event?.organizer),
     }));
-
-    res.json({ total: count, payments });
-  } catch (err) {
-    next(err);
+    res.json({ total: count, limit, offset, payments });
+  } catch (error) {
+    next(error);
   }
 }
 
-module.exports = { overview, listUsers, getUser, updateUser, listEvents, listPayments };
+// GET /api/admin/audit-logs
+async function listAuditLogs(req, res, next) {
+  try {
+    const search = String(req.query.search || '').trim();
+    const action = String(req.query.action || '').trim();
+    const { limit, offset } = pagination(req.query);
+    const where = {};
+    if (action) where.action = action;
+    if (search) {
+      where[Op.or] = [
+        { action: { [Op.like]: `%${search}%` } },
+        { targetLabel: { [Op.like]: `%${search}%` } },
+        { targetId: { [Op.like]: `%${search}%` } },
+        { '$admin.name$': { [Op.like]: `%${search}%` } },
+        { '$admin.email$': { [Op.like]: `%${search}%` } },
+      ];
+    }
+    const { rows, count } = await AdminAuditLog.findAndCountAll({
+      where,
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset,
+      distinct: true,
+      subQuery: false,
+      include: [{ model: User, as: 'admin', attributes: ['id', 'name', 'email'] }],
+    });
+    res.json({
+      total: count,
+      limit,
+      offset,
+      logs: rows.map((item) => ({
+        id: item.id,
+        action: item.action,
+        targetType: item.targetType,
+        targetId: item.targetId,
+        targetLabel: item.targetLabel,
+        metadata: item.metadata,
+        ip: item.ip,
+        createdAt: item.createdAt,
+        admin: organizerSummary(item.admin),
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// GET /api/admin/system
+async function systemStatus(req, res, next) {
+  try {
+    const databaseStartedAt = Date.now();
+    await sequelize.authenticate();
+    const databaseLatencyMs = Date.now() - databaseStartedAt;
+    const paymentConfigured = Boolean(process.env.ASAAS_API_KEY);
+    const emailProvider = process.env.RESEND_API_KEY ? 'Resend' : (process.env.SMTP_HOST ? 'SMTP' : 'Modo de desenvolvimento');
+    const storageProvider = storage.useS3 ? 'Amazon S3' : 'Disco local';
+
+    res.json({
+      checkedAt: new Date().toISOString(),
+      runtime: {
+        environment: process.env.NODE_ENV || 'development',
+        nodeVersion: process.version,
+        uptimeSeconds: Math.round(process.uptime()),
+        startedAt: new Date(Date.now() - (process.uptime() * 1000)).toISOString(),
+      },
+      services: [
+        {
+          id: 'database',
+          label: 'Banco de dados',
+          provider: process.env.DATABASE_URL ? 'PostgreSQL' : 'SQLite',
+          status: 'operational',
+          detail: `${databaseLatencyMs} ms de resposta`,
+        },
+        {
+          id: 'storage',
+          label: 'Armazenamento',
+          provider: storageProvider,
+          status: process.env.NODE_ENV === 'production' && !storage.useS3 ? 'attention' : 'operational',
+          detail: storage.useS3 ? 'Objetos persistentes configurados' : 'Arquivos mantidos no servidor',
+        },
+        {
+          id: 'payments',
+          label: 'Pagamentos',
+          provider: paymentConfigured ? `Asaas (${process.env.ASAAS_ENV || 'sandbox'})` : 'Mock local',
+          status: paymentConfigured ? 'operational' : 'attention',
+          detail: paymentConfigured ? 'Credencial configurada' : 'Sem gateway real configurado',
+        },
+        {
+          id: 'email',
+          label: 'Emails transacionais',
+          provider: emailProvider,
+          status: emailProvider === 'Modo de desenvolvimento' ? 'attention' : 'operational',
+          detail: emailProvider === 'Modo de desenvolvimento' ? 'Mensagens apenas no console' : 'Provedor configurado',
+        },
+      ],
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = {
+  overview,
+  listUsers,
+  getUser,
+  updateUser,
+  listEvents,
+  getEvent,
+  closeEvent,
+  revealEvent,
+  deleteEvent,
+  listPayments,
+  listAuditLogs,
+  systemStatus,
+};

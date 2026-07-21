@@ -15,8 +15,9 @@ export default function PlanSelector({ value, onChange }) {
           max={PLANS.length - 1}
           step={1}
           value={idx < 0 ? 0 : idx}
+          aria-label="Quantidade de participantes do plano"
           onChange={(e) => onChange(PLANS[Number(e.target.value)].id)}
-          className="w-full accent-[#C4A96C]"
+          className="h-11 w-full accent-[#C4A96C]"
         />
         <div className="mt-1.5 flex justify-between font-mono text-[11px] text-cream-dim/70">
           {PLANS.map((p) => (
@@ -49,8 +50,10 @@ export default function PlanSelector({ value, onChange }) {
         {PLANS.map((p) => (
           <button
             key={p.id}
+            type="button"
+            aria-pressed={p.id === value}
             onClick={() => onChange(p.id)}
-            className={`rounded-xl border py-2 font-mono text-xs font-medium transition-all ${
+            className={`min-h-11 rounded-xl border px-1 font-mono text-xs font-medium transition-all ${
               p.id === value
                 ? 'border-gold/70 bg-gold text-[#1c160c]'
                 : 'border-line text-cream-dim hover:border-gold/40 hover:text-cream'
