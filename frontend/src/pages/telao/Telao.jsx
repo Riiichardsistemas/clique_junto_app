@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { guestApi } from '../../api/guestApi';
+import LogoMark from '../../components/ui/LogoMark.jsx';
 
 const ADVANCE_MS = 5500;   // tempo de cada foto
 const POLL_MS = 8000;      // busca novas fotos
@@ -153,7 +154,12 @@ export default function Telao() {
       <footer className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-between px-8 py-5 text-sm text-cream-dim">
         <span>{data.total ? `${data.total} momento(s)` : ''}</span>
         {isNew && <span className="animate-fadein font-medium" style={{ color: accent }}>✦ nova foto</span>}
-        {event?.showBranding ? <span className="font-serif">Clique Junto</span> : <span />}
+        {event?.showBranding ? (
+          <span className="flex items-center gap-2 font-serif">
+            <LogoMark accent={accent} className="h-[18px] w-[18px] shrink-0" />
+            Clique Junto
+          </span>
+        ) : <span />}
       </footer>
     </div>
   );

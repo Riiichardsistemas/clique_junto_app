@@ -122,9 +122,7 @@
     @apply inline-flex min-h-11 min-w-11 items-center gap-2.5 rounded-full text-cream transition-colors;
   }
 
-  .brand-mark {
-    @apply text-[22px] font-extrabold leading-none text-gold;
-  }
+  /* .brand-mark foi removido: o símbolo agora é o componente <LogoMark /> (SVG inline). */
 
   .brand-name {
     @apply font-serif text-[22px] font-bold tracking-tight;

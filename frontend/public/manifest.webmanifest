@@ -1,0 +1,32 @@
+{
+  "name": "Clique Junto",
+  "short_name": "Clique Junto",
+  "description": "Crie uma câmera compartilhada e privada para o seu evento. Convidados fotografam direto pelo navegador.",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#09090a",
+  "theme_color": "#09090a",
+  "icons": [
+    {
+      "src": "/logos/favicon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logos/favicon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logos/icone-app-1024.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

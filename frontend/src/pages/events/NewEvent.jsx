@@ -12,6 +12,7 @@ import FilterSelector from '../../components/FilterSelector';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Brand from '../../components/ui/Brand';
+import LogoMark from '../../components/ui/LogoMark.jsx';
 import { PLANS, formatBRL } from '../../utils/plans';
 
 const EVENT_TYPES = [
@@ -147,7 +148,7 @@ export default function NewEvent() {
             <ChevronLeft size={16} />
             Voltar
           </button>
-          <Brand compact className="[&_.brand-mark]:text-[20px]" />
+          <Brand compact className="[&_svg]:h-[22px] [&_svg]:w-[22px]" />
           <span className="w-16" />
         </div>
       </header>
@@ -291,7 +292,10 @@ export default function NewEvent() {
                 <p className="label-mono mb-2 text-cream-dim/70">Prévia da página do convidado</p>
                 {form.entryTemplate === 'convite' ? (
                   <div className="overflow-hidden rounded-2xl border border-line bg-[#f2ead9] px-4 pb-6 pt-4 text-center text-[#2b241a]">
-                    <p className="font-serif text-xs italic text-[#2b241a]/70">Clique Junto</p>
+                    <p className="flex items-center justify-center gap-1.5 font-serif text-xs italic text-[#2b241a]/70">
+                      <LogoMark variant="light" className="h-3.5 w-3.5 shrink-0" />
+                      Clique Junto
+                    </p>
                     <div className="relative mx-auto mt-2 h-28 w-36">
                       {invitePreviews[1] && (
                         <span className="absolute left-1/2 top-1 h-24 w-20 -translate-x-[80%] -rotate-6 overflow-hidden rounded-sm bg-white p-1 shadow-md">

@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { Mail, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import Brand from '../components/ui/Brand.jsx';
+import LogoMark from '../components/ui/LogoMark.jsx';
 
 /*
  * Tela de login em dois painéis, fiel ao mockup:
@@ -126,9 +127,8 @@ export default function Login() {
       <div className="relative z-10 my-auto w-full max-w-[1060px] shrink-0 animate-slideup">
         {/* ===== Cabeçalho mobile sobre a foto — marca + tagline ===== */}
         <div className="mb-6 flex flex-col items-center text-center md:hidden">
-          <span aria-hidden="true" className="mb-1.5 text-[30px] leading-none text-gold drop-shadow-[0_2px_10px_rgba(0,0,0,.8)]">✱</span>
+          <LogoMark className="mb-3 h-[52px] w-[52px] drop-shadow-[0_3px_14px_rgba(0,0,0,.85)]" />
           <div className="mb-3.5 flex items-center gap-2 [text-shadow:0_1px_10px_rgba(0,0,0,.85)]">
-            <span aria-hidden="true" className="text-[17px] font-extrabold leading-none text-gold">✱</span>
             <span className="font-serif text-[19px] font-bold tracking-tight text-cream">Clique Junto</span>
           </div>
           {/* text-shadow: a serif fina sobre a foto precisa de separação do fundo */}
@@ -145,10 +145,10 @@ export default function Login() {
         {/* Chip com a marca, canto inferior esquerdo */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -bottom-6 -left-7 z-20 hidden h-12 w-12 items-center justify-center rounded-2xl border border-line bg-surface-2 text-xl text-gold shadow-btn lg:flex"
+          className="pointer-events-none absolute -bottom-6 -left-7 z-20 hidden h-12 w-12 items-center justify-center rounded-2xl border border-line bg-surface-2 shadow-btn lg:flex"
           style={{ transform: 'rotate(-6deg)' }}
         >
-          ✱
+          <LogoMark className="h-7 w-7" />
         </div>
 
         {/* Brilho de estrela, canto inferior direito */}
@@ -178,9 +178,8 @@ export default function Login() {
             <div className="absolute inset-0 film-grain opacity-30 mix-blend-soft-light" />
 
             <div className="relative flex h-full flex-col items-center justify-center px-10 text-center">
-              <span aria-hidden="true" className="mb-2 text-[38px] leading-none text-gold">✱</span>
-              <div className="mb-7 flex items-center gap-2.5">
-                <span aria-hidden="true" className="text-[22px] font-extrabold leading-none text-gold">✱</span>
+              <LogoMark className="mb-4 h-[62px] w-[62px] drop-shadow-[0_3px_16px_rgba(0,0,0,.7)]" />
+              <div className="mb-7 flex items-center gap-2.5 [text-shadow:0_1px_10px_rgba(0,0,0,.7)]">
                 <span className="font-serif text-[26px] font-bold tracking-tight text-cream">Clique Junto</span>
               </div>
               <h2 className="max-w-[17ch] font-serif text-[36px] font-semibold leading-[1.14] tracking-tight text-cream [text-shadow:0_2px_16px_rgba(0,0,0,.8)] lg:text-[44px]">

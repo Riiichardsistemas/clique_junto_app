@@ -1,0 +1,23 @@
+LOGO CLIQUE JUNTO — direção 1b "O Álbum"
+
+Cores da marca:
+  Preto     #0b0b0c
+  Creme     #ece0c8
+  Dourado   #d9c193 (escuro: #b3945f para fundo claro)
+  Papel     #faf7f0
+Fonte do wordmark: Cormorant Garamond (Google Fonts) — "Clique" regular, "Junto" itálico.
+
+Arquivos:
+  lockup-fundo-escuro.png ... logo completo, transparente, p/ fundos escuros (site header)
+  lockup-fundo-claro.png .... logo completo, transparente, p/ fundos claros
+  simbolo-fundo-escuro.svg/.png ... só o símbolo, transparente (vetor + PNG)
+  simbolo-fundo-claro.svg/.png .... idem, versão p/ fundo claro
+  icone-app-1024.png ........ ícone quadrado 1024×1024 (lojas / PWA)
+  favicon-512.png / favicon-192.png ... PWA manifest icons
+  apple-touch-icon-180.png .. iOS "adicionar à tela"
+  favicon-32.png / favicon.svg ... favicon do navegador
+
+No HTML do site:
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/apple-touch-icon-180.png">

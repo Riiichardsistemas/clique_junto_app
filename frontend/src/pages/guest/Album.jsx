@@ -8,6 +8,7 @@ import { FILTER_DEFS } from '../../utils/filters';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import PageLoader from '../../components/ui/PageLoader';
 import useLightboxNavigation from '../../hooks/useLightboxNavigation';
+import LogoMark from '../../components/ui/LogoMark.jsx';
 
 // Vídeos têm o filtro aplicado via CSS na exibição
 function videoFilterCss(p) {
@@ -32,7 +33,10 @@ function GrowthCTA({ slug }) {
         className="btn-primary mt-4 inline-block rounded-2xl px-8 py-3 text-sm">
         Criar meu evento grátis
       </Link>
-      <p className="label-mono mt-3 text-cream/25">feito com Clique Junto</p>
+      <p className="label-mono mt-3 flex items-center justify-center gap-1.5 text-cream/25">
+        <LogoMark className="h-3.5 w-3.5 shrink-0 opacity-70" />
+        feito com Clique Junto
+      </p>
     </div>
   );
 }

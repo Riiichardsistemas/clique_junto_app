@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { eventApi } from '../../api/eventApi';
 import PageLoader from '../../components/ui/PageLoader';
+import LogoMark from '../../components/ui/LogoMark.jsx';
 
 const PRESET_COLORS = ['#C4A96C', '#E8B4B8', '#7EA4A0', '#8E7CC3', '#D98C5F', '#5B7DB1', '#B5654A', '#3F4A3C'];
 
@@ -221,7 +222,10 @@ export default function EventCustomize() {
               <div>
                 <p className="label-mono mb-2 text-cream-dim/70">Prévia</p>
                 <div className="overflow-hidden rounded-xl border border-line bg-[#f2ead9] px-4 pb-5 pt-4 text-center text-[#2b241a]">
-                  <p className="font-serif text-xs italic text-[#2b241a]/70">Clique Junto</p>
+                  <p className="flex items-center justify-center gap-1.5 font-serif text-xs italic text-[#2b241a]/70">
+                    <LogoMark variant="light" className="h-3.5 w-3.5 shrink-0" />
+                    Clique Junto
+                  </p>
                   <div className="relative mx-auto mt-2 h-24 w-32">
                     {(event?.invitePhoto2Url || event?.invitePhoto3Url) && (
                       <span className="absolute left-1/2 top-1 h-20 w-[4.5rem] -translate-x-[80%] -rotate-6 overflow-hidden rounded-sm bg-white p-1 shadow-md">

@@ -5,6 +5,7 @@ import { guestApi } from '../../api/guestApi';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import PageLoader from '../../components/ui/PageLoader';
 import Brand from '../../components/ui/Brand';
+import LogoMark from '../../components/ui/LogoMark.jsx';
 
 function hexToRgba(hex, a = 1) {
   if (!hex) return null;
@@ -76,8 +77,9 @@ function ConviteEntry({
     <div className="app-screen flex flex-col items-center overflow-x-hidden bg-[#f2ead9] px-5 py-8 sm:py-12" style={{ color: ink }}>
       <div className="w-full max-w-sm animate-slideup text-center">
         {/* Marca */}
-        <p className="font-serif text-lg font-semibold" style={{ color: `${ink}B3` }}>
-          <span className="mr-1.5" style={{ color: accent }}>✱</span>Clique Junto
+        <p className="flex items-center justify-center gap-2 font-serif text-lg font-semibold" style={{ color: `${ink}B3` }}>
+          <LogoMark variant="light" accent={accent} className="h-[22px] w-[22px] shrink-0" />
+          Clique Junto
         </p>
 
         {/* Pilha de polaroids — leque orgânico; com 3 fotos a principal centraliza
