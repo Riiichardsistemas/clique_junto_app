@@ -12,15 +12,13 @@ import Brand from '../components/ui/Brand.jsx';
  * - Polaroids decorativos flutuando ao redor do cartão.
  *
  * Imagens (opcionais — há fallback em gradiente se não existirem):
- *   frontend/public/login-hero.jpg        → foto grande do painel esquerdo
- *   frontend/public/login-polaroid-1.jpg  → polaroid superior direito
- *   frontend/public/login-polaroid-2.jpg  → polaroid direito
- *   frontend/public/login-polaroid-3.jpg  → polaroid inferior central
+ *   frontend/public/login-hero.webp → foto dos noivos (painel esquerdo e polaroid inferior)
+ *   frontend/public/couple.webp     → foto do brinde (polaroids do canto direito)
  */
 
 const hideOnError = (e) => { e.currentTarget.style.display = 'none'; };
 
-function Polaroid({ src, className = '', rotate = 0, size = 'h-[72px] w-[72px]' }) {
+function Polaroid({ src, className = '', rotate = 0, size = 'h-[72px] w-[72px]', position = 'center' }) {
   return (
     <div
       aria-hidden="true"
@@ -28,7 +26,7 @@ function Polaroid({ src, className = '', rotate = 0, size = 'h-[72px] w-[72px]' 
       style={{ transform: `rotate(${rotate}deg)` }}
     >
       <div className="h-full w-full overflow-hidden rounded-[10px] bg-gradient-to-br from-[#2b2620] via-[#1c1a17] to-[#121112]">
-        <img src={src} alt="" onError={hideOnError} className="h-full w-full object-cover" />
+        <img src={src} alt="" onError={hideOnError} className="h-full w-full object-cover" style={{ objectPosition: position }} />
       </div>
     </div>
   );
@@ -99,16 +97,50 @@ export default function Login() {
   const socialSoon = () => toast('Login social em breve!', { icon: '✨' });
 
   return (
-    <div className="app-screen relative flex items-center justify-center overflow-x-hidden px-4 py-8 sm:px-6 lg:py-14">
-      {/* Brilhos de fundo */}
-      <div className="pointer-events-none absolute left-1/2 top-[-16rem] h-[34rem] w-[34rem] -translate-x-1/2 rounded-full bg-blue/[0.05] blur-3xl" />
-      <div className="pointer-events-none absolute bottom-[-12rem] right-[-8rem] h-[28rem] w-[28rem] rounded-full bg-gold/[0.05] blur-3xl" />
+    <div
+      className="relative flex h-[100dvh] justify-center overflow-y-auto overflow-x-hidden px-4 sm:px-6 lg:px-16"
+      style={{
+        paddingTop: 'max(1.5rem, env(safe-area-inset-top))',
+        paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))',
+      }}
+    >
+      {/* ===== Mobile: a foto do evento vira o fundo da tela inteira =====
+          Espelha o painel esquerdo do desktop, que some abaixo de md. */}
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 md:hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#26221c] via-[#171512] to-[#0d0c0b]" />
+        <img
+          src="/login-hero.webp"
+          alt=""
+          onError={hideOnError}
+          className="absolute inset-0 h-full w-full scale-110 object-cover blur-[6px]"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/72 to-black/92" />
+        <div className="absolute inset-0 film-grain opacity-30 mix-blend-soft-light" />
+      </div>
 
-      <div className="relative z-10 w-full max-w-[1060px] animate-slideup">
+      {/* Brilhos de fundo — só no desktop, para não competir com a foto no mobile */}
+      <div className="pointer-events-none fixed left-1/2 top-[-16rem] hidden h-[34rem] w-[34rem] -translate-x-1/2 rounded-full bg-blue/[0.05] blur-3xl md:block" />
+      <div className="pointer-events-none fixed bottom-[-12rem] right-[-8rem] hidden h-[28rem] w-[28rem] rounded-full bg-gold/[0.05] blur-3xl md:block" />
+
+      {/* my-auto: centraliza quando cabe, encosta no topo quando não cabe (evita corte) */}
+      <div className="relative z-10 my-auto w-full max-w-[1060px] shrink-0 animate-slideup">
+        {/* ===== Cabeçalho mobile sobre a foto — marca + tagline ===== */}
+        <div className="mb-6 flex flex-col items-center text-center md:hidden">
+          <span aria-hidden="true" className="mb-1.5 text-[30px] leading-none text-gold drop-shadow-[0_2px_10px_rgba(0,0,0,.8)]">✱</span>
+          <div className="mb-3.5 flex items-center gap-2 [text-shadow:0_1px_10px_rgba(0,0,0,.85)]">
+            <span aria-hidden="true" className="text-[17px] font-extrabold leading-none text-gold">✱</span>
+            <span className="font-serif text-[19px] font-bold tracking-tight text-cream">Clique Junto</span>
+          </div>
+          {/* text-shadow: a serif fina sobre a foto precisa de separação do fundo */}
+          <h2 className="max-w-[16ch] font-serif text-[27px] font-semibold leading-[1.18] tracking-tight text-cream [text-shadow:0_2px_14px_rgba(0,0,0,.9)]">
+            Capture seu dia pelos olhos <em className="italic text-gold-light">de todos.</em>
+          </h2>
+        </div>
+
         {/* Polaroids decorativos */}
-        <Polaroid src="/login-polaroid-1.jpg" rotate={8}  className="-right-8 -top-8" />
-        <Polaroid src="/login-polaroid-2.jpg" rotate={-6} className="-right-14 top-16" size="h-16 w-16" />
-        <Polaroid src="/login-polaroid-3.jpg" rotate={-8} className="-bottom-9 left-[42%]" />
+        <Polaroid src="/couple.webp"     rotate={8}  className="-right-8 -top-8" position="center 30%" />
+        <Polaroid src="/couple.webp"     rotate={-6} className="-right-14 top-16" size="h-16 w-16" position="70% center" />
+        <Polaroid src="/login-hero.webp" rotate={-8} className="-bottom-9 left-[42%]" position="center 35%" />
 
         {/* Chip com a marca, canto inferior esquerdo */}
         <div
@@ -130,13 +162,13 @@ export default function Login() {
         </svg>
 
         {/* Cartão principal */}
-        <div className="relative grid overflow-hidden rounded-[26px] border border-line shadow-float md:grid-cols-[1.08fr_1fr]">
+        <div className="relative grid overflow-hidden rounded-[26px] border border-white/[0.14] shadow-float md:grid-cols-[1.08fr_1fr] md:border-line">
           {/* ===== Painel esquerdo — foto + marca + tagline ===== */}
-          <div className="relative hidden min-h-[560px] md:block">
+          <div className="relative hidden min-h-[480px] md:block lg:min-h-[540px]">
             {/* Fallback em gradiente caso a foto não exista */}
             <div className="absolute inset-0 bg-gradient-to-br from-[#26221c] via-[#171512] to-[#0d0c0b]" />
             <img
-              src="/login-hero.jpg"
+              src="/login-hero.webp"
               alt=""
               onError={hideOnError}
               className="absolute inset-0 h-full w-full scale-[1.06] object-cover blur-[5px]"
@@ -146,32 +178,29 @@ export default function Login() {
             <div className="absolute inset-0 film-grain opacity-30 mix-blend-soft-light" />
 
             <div className="relative flex h-full flex-col items-center justify-center px-10 text-center">
-              <span aria-hidden="true" className="mb-2 text-[44px] leading-none text-gold">✱</span>
-              <div className="mb-8 flex items-center gap-2.5">
+              <span aria-hidden="true" className="mb-2 text-[38px] leading-none text-gold">✱</span>
+              <div className="mb-7 flex items-center gap-2.5">
                 <span aria-hidden="true" className="text-[22px] font-extrabold leading-none text-gold">✱</span>
                 <span className="font-serif text-[26px] font-bold tracking-tight text-cream">Clique Junto</span>
               </div>
-              <h2 className="max-w-[17ch] font-serif text-[42px] font-semibold leading-[1.08] tracking-tight text-cream lg:text-[48px]">
+              <h2 className="max-w-[17ch] font-serif text-[36px] font-semibold leading-[1.14] tracking-tight text-cream [text-shadow:0_2px_16px_rgba(0,0,0,.8)] lg:text-[44px]">
                 Capture seu dia pelos olhos <em className="italic text-gold-light">de todos.</em>
               </h2>
             </div>
           </div>
 
           {/* ===== Painel direito — formulário ===== */}
-          <div className="relative bg-[#151517]/95 px-6 py-9 sm:px-10 sm:py-12">
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.03] to-transparent" />
+          <div className="relative bg-[#141416]/82 px-6 py-7 backdrop-blur-2xl sm:px-10 sm:py-10 md:bg-[#151517]/95 md:backdrop-blur-none">
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.05] to-transparent md:from-white/[0.03]" />
             <div className="relative mx-auto w-full max-w-[380px]">
-              {/* Marca visível apenas no mobile (o painel esquerdo some) */}
-              <div className="mb-6 flex justify-center md:hidden"><Brand to="/login" /></div>
+              <h1 className="font-serif text-[30px] font-semibold leading-none tracking-tight sm:text-[40px]">Entrar</h1>
+              <p className="mb-6 mt-2 text-[15px] leading-relaxed text-cream/70">Acesse o painel dos seus eventos</p>
 
-              <h1 className="font-serif text-[40px] font-semibold leading-none tracking-tight sm:text-[44px]">Entrar</h1>
-              <p className="mb-8 mt-2.5 text-sm leading-relaxed text-cream-dim">Acesse o painel dos seus eventos</p>
-
-              <form onSubmit={onSubmit} className="space-y-5">
+              <form onSubmit={onSubmit} className="space-y-4">
                 <div>
-                  <label htmlFor="email" className="mb-2 block text-sm text-cream-dim">Email</label>
+                  <label htmlFor="email" className="mb-2 block text-sm font-medium text-cream/85">Email</label>
                   <div className="relative">
-                    <Mail aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-cream-dim/70" />
+                    <Mail aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-cream/55" />
                     <input
                       id="email"
                       name="email"
@@ -187,9 +216,9 @@ export default function Login() {
                 </div>
 
                 <div>
-                  <label htmlFor="password" className="mb-2 block text-sm text-cream-dim">Senha</label>
+                  <label htmlFor="password" className="mb-2 block text-sm font-medium text-cream/85">Senha</label>
                   <div className="relative">
-                    <KeyRound aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-cream-dim/70" />
+                    <KeyRound aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-cream/55" />
                     <input
                       id="password"
                       name="password"
@@ -205,7 +234,7 @@ export default function Login() {
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
                       aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                      className="absolute right-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-cream-dim/70 transition hover:text-cream"
+                      className="absolute right-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-cream/60 transition hover:text-cream"
                     >
                       {showPassword ? <Eye className="h-[18px] w-[18px]" /> : <EyeOff className="h-[18px] w-[18px]" />}
                     </button>
@@ -227,10 +256,10 @@ export default function Login() {
               </form>
 
               {/* Divisor */}
-              <div className="mt-7 flex items-center gap-4">
-                <span className="h-px flex-1 bg-white/10" />
-                <span className="text-[13px] text-cream-dim">Ou entre com</span>
-                <span className="h-px flex-1 bg-white/10" />
+              <div className="mt-6 flex items-center gap-4">
+                <span className="h-px flex-1 bg-white/12" />
+                <span className="text-[13px] font-medium text-cream/65">Ou entre com</span>
+                <span className="h-px flex-1 bg-white/12" />
               </div>
 
               {/* Social */}
@@ -240,14 +269,14 @@ export default function Login() {
                 <SocialButton label="Entrar com Google" onClick={socialSoon}><GoogleIcon /></SocialButton>
               </div>
 
-              <p className="mt-6 text-center text-sm">
-                <Link to="/forgot-password" className="inline-flex min-h-11 items-center text-cream-dim transition hover:text-cream">
+              <p className="mt-4 text-center text-sm">
+                <Link to="/forgot-password" className="inline-flex min-h-10 items-center font-medium text-cream/75 transition hover:text-cream">
                   Esqueci minha senha
                 </Link>
               </p>
-              <p className="text-center text-sm text-cream-dim">
+              <p className="text-center text-sm text-cream/70">
                 Não tem conta?{' '}
-                <Link to="/register" className="inline-flex min-h-11 items-center font-medium text-gold underline-offset-4 hover:underline">
+                <Link to="/register" className="inline-flex min-h-10 items-center font-medium text-gold underline-offset-4 hover:underline">
                   Criar agora
                 </Link>
               </p>

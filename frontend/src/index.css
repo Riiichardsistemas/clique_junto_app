@@ -167,7 +167,8 @@
   }
 
   textarea.input-field { min-height: 96px; }
-  .input-field::placeholder { color: rgba(170,165,156,.55); }
+  /* .55 reprovava em contraste (~3:1). .8 sobe para ~5.5:1 e segue lendo como placeholder. */
+  .input-field::placeholder { color: rgba(182,177,168,.8); }
   .input-field:hover { border-color: var(--border-strong); }
   .input-field:focus {
     border-color: rgba(152,215,247,.7);
