@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { X, ChevronLeft, ChevronRight, Download, Lock, Camera, LayoutDashboard } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Download, Lock, Camera, LayoutDashboard, Share2, Sparkles } from 'lucide-react';
 import { guestApi } from '../../api/guestApi';
 import { photoApi } from '../../api/photoApi';
 import { FILTER_DEFS } from '../../utils/filters';
@@ -130,6 +130,7 @@ export default function Album() {
   const isGuest = !!guestApi.getGuestToken(slug);
 
   const [event, setEvent] = useState(null);
+  const [stats, setStats] = useState({ guestCount: 0, photoCount: 0 });
   const [photos, setPhotos] = useState([]);
   const [revealed, setRevealed] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -137,6 +138,7 @@ export default function Album() {
   const [selected, setSelected] = useState(null);
   const [downloading, setDownloading] = useState(false);
   const [showBranding, setShowBranding] = useState(false);
+  const [showRecap, setShowRecap] = useState(false);
 
   useLightboxNavigation(selected, setSelected, photos.length);
 
@@ -144,6 +146,7 @@ export default function Album() {
     try {
       const ed = await guestApi.getEvent(slug);
       setEvent(ed.event);
+      if (ed.stats) setStats(ed.stats);
       const pd = await photoApi.listForEvent(ed.event.id);
       setRevealed(!!pd.revealed || !!ed.event.isRevealed);
       setPhotos(pd.photos || []);
@@ -195,47 +198,110 @@ export default function Album() {
   if (notFound) return <NotFound />;
   if (!revealed) return <AlbumLocked event={event} slug={slug} isGuest={isGuest} isOrganizer={isAuthenticated} />;
 
-  const canUseCamera = isGuest && event?.status === 'active';
+  // Mesmo revelado, o convidado pode voltar à câmera enquanto o evento aceita fotos
+  const canUseCamera = isGuest && !!event?.isAcceptingPhotos;
+
+  const coverSrc = event?.coverImageUrl || photos[0]?.thumbUrl || photos[0]?.url || null;
+  const endDate = event?.endsAt || event?.revealAt || event?.startsAt || null;
+  const endDateLabel = endDate
+    ? new Date(endDate).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' }).replace(' de ', ' ')
+    : '—';
+  const peopleCount = stats.guestCount || new Set(photos.map((p) => p.guestNickname).filter(Boolean)).size;
+
+  async function shareAlbum() {
+    const url = `${window.location.origin}/e/${slug}/album`;
+    const text = `✨ O álbum de "${event?.name}" foi revelado! Veja as fotos: ${url}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: event?.name, text, url }); } catch { /* cancelado */ }
+    } else {
+      navigator.clipboard.writeText(url);
+      toast.success('Link do álbum copiado!');
+    }
+  }
 
   return (
     <div className="app-screen bg-ink-deep text-cream">
-      {/* Header — barra fina, como no print */}
-      <header className="app-topbar sticky top-0 z-20 glass">
-        <div className="mx-auto flex min-h-[56px] max-w-6xl items-center justify-between px-4 sm:px-5">
-          {canUseCamera ? (
-            <Link to={`/e/${slug}/camera`}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[13px] text-cream-dim transition hover:text-cream">
-              <ChevronLeft size={15} />
-              Câmera
-            </Link>
-          ) : isAuthenticated ? (
-            <Link to="/dashboard"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[13px] text-cream-dim transition hover:text-cream">
-              <ChevronLeft size={15} />
-              Painel
-            </Link>
+      {/* ===== Hero — capa do evento fundindo com o fundo (mockup) ===== */}
+      <div className="relative">
+        <div className="relative h-[38vh] min-h-[260px] w-full overflow-hidden sm:h-[380px]">
+          {coverSrc ? (
+            <img src={coverSrc} alt="" className="h-full w-full object-cover" />
           ) : (
-            <span className="w-16" />
+            <div className="h-full w-full bg-gradient-to-br from-[#26221c] via-[#171512] to-ink-deep" />
           )}
-          <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 font-mono text-[11px] tracking-wider text-cream-dim">
-            revelado
-          </span>
+          {/* Fusão da foto com o fundo escuro */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-transparent to-ink-deep" />
         </div>
-      </header>
 
-      {/* Hero — título serifado centralizado + frames + Download Tudo */}
-      <section className="relative mx-auto max-w-6xl px-4 pb-2 pt-7 text-center sm:px-5 sm:pt-10">
-        <h1 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl md:text-5xl">{event?.name}</h1>
-        <p className="mt-2 text-sm text-cream-dim sm:mt-3">{photos.length} frames</p>
+        {/* Botão de voltar flutuante sobre a capa */}
+        {(canUseCamera || isAuthenticated) && (
+          <Link to={canUseCamera ? `/e/${slug}/camera` : '/dashboard'}
+            aria-label={canUseCamera ? 'Voltar à câmera' : 'Voltar ao painel'}
+            className="safe-fixed-top absolute left-4 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white/85 backdrop-blur-md transition hover:text-white">
+            {canUseCamera ? <Camera size={17} /> : <LayoutDashboard size={17} />}
+          </Link>
+        )}
+      </div>
+
+      {/* ===== Título + stats + ações (mockup) ===== */}
+      <section className="relative z-10 mx-auto -mt-20 max-w-xl px-5 text-center sm:-mt-24">
+        <h1 className="font-serif text-4xl font-semibold tracking-tight [text-shadow:0_2px_16px_rgba(0,0,0,.8)] sm:text-5xl">
+          {event?.name}
+        </h1>
+
+        {/* Linha de stats: Momentos · data Encerrado · Pessoas */}
+        <div className="mx-auto mt-6 flex max-w-sm items-stretch divide-x divide-white/10">
+          <div className="flex-1 px-2">
+            <p className="text-[17px] font-semibold leading-tight text-cream">{photos.length}</p>
+            <p className="mt-0.5 text-[11px] text-cream/40">Momentos</p>
+          </div>
+          <div className="flex-1 px-2">
+            <p className="text-[17px] font-semibold leading-tight text-cream">{endDateLabel}</p>
+            <p className="mt-0.5 text-[11px] text-cream/40">{event?.isAcceptingPhotos ? 'Em andamento' : 'Encerrado'}</p>
+          </div>
+          <div className="flex-1 px-2">
+            <p className="text-[17px] font-semibold leading-tight text-cream">{peopleCount}</p>
+            <p className="mt-0.5 text-[11px] text-cream/40">Pessoas</p>
+          </div>
+        </div>
+
+        {/* Ver retrospectiva — só quando o recap existe */}
+        {event?.recapVideoUrl && (
+          <button type="button" onClick={() => setShowRecap(true)}
+            className="btn-primary mt-6 w-full rounded-full py-3.5 text-[15px]">
+            <Sparkles size={16} />
+            Ver retrospectiva
+          </button>
+        )}
+
+        {/* Compartilhar · Salvar */}
         {photos.length > 0 && (
-          <div className="mt-4 flex justify-center sm:mt-6 md:absolute md:right-5 md:top-10 md:mt-0">
-            <button onClick={downloadAll} disabled={downloading} className="btn-ghost btn-sm gap-2">
-              <Download size={14} />
-              {downloading ? 'Preparando…' : 'Download Tudo'}
+          <div className={`flex gap-2.5 ${event?.recapVideoUrl ? 'mt-3' : 'mt-6'}`}>
+            <button type="button" onClick={shareAlbum} className="btn-ghost h-12 min-h-12 flex-1 rounded-full text-[14px]">
+              <Share2 size={16} />
+              Compartilhar
+            </button>
+            <button type="button" onClick={downloadAll} disabled={downloading} className="btn-ghost h-12 min-h-12 flex-1 rounded-full text-[14px] disabled:opacity-40">
+              <Download size={16} />
+              {downloading ? 'Preparando…' : 'Salvar'}
             </button>
           </div>
         )}
       </section>
+
+      {/* Overlay da retrospectiva */}
+      {showRecap && event?.recapVideoUrl && (
+        <div className="fixed inset-0 z-50 flex animate-fadein items-center justify-center bg-black/95 p-4 backdrop-blur-sm"
+          role="dialog" aria-modal="true" aria-label="Retrospectiva do evento" onClick={() => setShowRecap(false)}>
+          <button type="button" aria-label="Fechar retrospectiva"
+            className="safe-fixed-top icon-button absolute right-4 border-white/10 bg-white/[0.06] text-white/60 hover:text-white"
+            onClick={() => setShowRecap(false)}>
+            <X size={17} />
+          </button>
+          <video src={event.recapVideoUrl} controls autoPlay playsInline
+            className="max-h-[80dvh] w-full max-w-3xl rounded-2xl" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
 
       <main className="mx-auto max-w-6xl px-3 py-6 sm:px-4 sm:py-8">
         {photos.length === 0 ? (

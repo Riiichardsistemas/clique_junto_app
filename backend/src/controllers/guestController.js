@@ -115,14 +115,12 @@ async function me(req, res) {
 }
 
 // GET /api/guests/slideshow/:key — dados do telão (link secreto, sem login)
-// Se liveWallEnabled: mostra fotos ao vivo. Senão, só depois da revelação.
+// O telão não depende da revelação: o link é secreto e só o organizador o tem —
+// abrir/compartilhar o telão já é a decisão de exibir as fotos ao vivo.
 async function slideshow(req, res, next) {
   try {
     const event = await Event.findOne({ where: { slideshowKey: req.params.key } });
     if (!event) return res.status(404).json({ error: 'Telao nao encontrado.' });
-
-    const live = !!event.liveWallEnabled;
-    const revealed = event.isRevealed();
 
     const brand = {
       id: event.id,
@@ -134,13 +132,8 @@ async function slideshow(req, res, next) {
       showBranding: event.planId === 'free',
     };
 
-    // Sem modo ao vivo e ainda não revelado → tela de espera
-    if (!live && !revealed) {
-      return res.json({ mode: 'waiting', event: brand, photos: [], revealAt: event.revealAt });
-    }
-
-    // Ao vivo mostra tudo; senão apenas as visíveis (reveladas)
-    const where = live ? { eventId: event.id } : { eventId: event.id, isVisible: true };
+    // Sempre ao vivo: todas as fotos do evento, na ordem de chegada
+    const where = { eventId: event.id };
     const limit = Math.min(Number(req.query.limit) || 80, 150);
 
     const rows = await Photo.findAll({
@@ -160,7 +153,7 @@ async function slideshow(req, res, next) {
     })));
 
     const total = await Photo.count({ where });
-    res.json({ mode: live ? 'live' : 'revealed', event: brand, photos, total });
+    res.json({ mode: 'live', event: brand, photos, total });
   } catch (err) {
     next(err);
   }

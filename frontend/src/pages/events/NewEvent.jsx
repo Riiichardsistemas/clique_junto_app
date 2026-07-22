@@ -226,7 +226,7 @@ export default function NewEvent() {
                 <div className="sm:col-span-2">
                   <label className="mb-1.5 block text-sm font-medium text-cream-dim">Revelação (quando as fotos aparecem)</label>
                   <input aria-label="Revelação do álbum" type="datetime-local" value={form.revealAt} onChange={(e) => set('revealAt', e.target.value)} className="input-field" />
-                  <p className="mt-1.5 text-xs text-cream-dim/70">Deixe vazio para revelar automaticamente no encerramento.</p>
+                  <p className="mt-1.5 text-xs text-cream-dim/70">Deixe vazio para o álbum ficar visível desde o início.</p>
                 </div>
               </div>
 
@@ -459,7 +459,7 @@ export default function NewEvent() {
                 <Row label="Tipo" value={EVENT_TYPES.find((t) => t.id === form.type)?.label} />
                 <Row label="Início" value={form.startsAt ? new Date(form.startsAt).toLocaleString('pt-BR') : '—'} />
                 <Row label="Encerramento" value={form.endsAt ? new Date(form.endsAt).toLocaleString('pt-BR') : '—'} />
-                <Row label="Revelação" value={form.revealAt ? new Date(form.revealAt).toLocaleString('pt-BR') : 'No encerramento'} />
+                <Row label="Revelação" value={form.revealAt ? new Date(form.revealAt).toLocaleString('pt-BR') : 'Imediata — álbum aberto'} />
                 <Row label="Fotos/convidado" value={form.photoLimitPerGuest === 0 ? 'Ilimitado' : form.photoLimitPerGuest} />
                 <Row label="Filtro" value={form.defaultFilter} />
                 <Row label="Modelo da página" value={form.entryTemplate === 'convite' ? 'Convite (polaroids)' : 'Clássico'} />

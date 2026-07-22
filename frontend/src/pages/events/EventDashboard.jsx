@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import {
   ChevronLeft, ChevronRight, Pencil, Trash2, Rocket, Lock, Sparkles, Download,
   Copy, QrCode, Clapperboard, X, Images, CreditCard, Palette, Monitor, MoreHorizontal,
+  Heart, PartyPopper, Cake, Briefcase, Plane, Camera as CameraIcon, Share2,
 } from 'lucide-react';
 import { eventApi } from '../../api/eventApi';
 import { photoApi } from '../../api/photoApi';
@@ -19,12 +20,38 @@ const TYPE_LABEL = {
   corporativo: 'Corporativo', viagem: 'Viagem', outro: 'Evento',
 };
 
+// Ícone e cor por tipo — aparece junto ao nome no cabeçalho (mockup: ❤️ vermelho)
+const TYPE_META = {
+  casamento:   { Icon: Heart,       cls: 'text-red-400' },
+  festa:       { Icon: PartyPopper, cls: 'text-gold' },
+  aniversario: { Icon: Cake,        cls: 'text-pink-300' },
+  corporativo: { Icon: Briefcase,   cls: 'text-blue-300' },
+  viagem:      { Icon: Plane,       cls: 'text-sky-300' },
+  outro:       { Icon: CameraIcon,  cls: 'text-gold' },
+};
+
+const STATUS_META = {
+  draft:    { label: 'Rascunho',  dot: 'bg-cream/40' },
+  active:   { label: 'Ativo',     dot: 'bg-emerald-400' },
+  closed:   { label: 'Encerrado', dot: 'bg-amber-400' },
+  revealed: { label: 'Revelado',  dot: 'bg-gold' },
+};
+
 function StatusBadge({ status }) {
   const map = { draft: 'badge-draft', active: 'badge-active', closed: 'badge-closed', revealed: 'badge-revealed' };
   const labels = { draft: 'Rascunho', active: 'Ativo', closed: 'Encerrado', revealed: 'Revelado' };
   return <span className={map[status] || 'badge-draft'}>{labels[status] || status}</span>;
 }
 
+function timeAgo(iso) {
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return 'agora mesmo';
+  if (s < 3600) return `há ${Math.floor(s / 60)} min`;
+  if (s < 86400) return `há ${Math.floor(s / 3600)} h`;
+  return `há ${Math.floor(s / 86400)} d`;
+}
+
+// Cartão dourado do mockup: rótulo + data à esquerda, contagem grande à direita
 function CountdownPanel({ label, target }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -38,10 +65,15 @@ function CountdownPanel({ label, target }) {
   const hh = String(Math.floor(s / 3600)).padStart(2, '0');
   const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
   const ss = String(s % 60).padStart(2, '0');
+  const d = new Date(target);
+  const when = `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}, ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
   return (
-    <div className="card flex items-center justify-between p-4">
-      <p className="label-mono text-cream/35">{label}</p>
-      <p className={`font-mono text-lg ${done ? 'text-cream/40' : 'text-cream'}`}>
+    <div className="flex items-center justify-between gap-3 rounded-2xl border border-gold/[0.18] bg-gradient-to-br from-gold/[0.10] via-gold/[0.05] to-transparent px-4 py-3.5">
+      <div className="min-w-0">
+        <p className="label-mono !text-[10px] text-gold/75">{label}</p>
+        <p className="mt-1 font-mono text-[11px] tracking-wider text-cream/40">{when}</p>
+      </div>
+      <p className={`shrink-0 font-mono text-[27px] font-semibold tracking-tight ${done ? 'text-cream/35' : 'text-gold-light'}`}>
         {done ? '—' : `${hh}:${mm}:${ss}`}
       </p>
     </div>
@@ -50,9 +82,9 @@ function CountdownPanel({ label, target }) {
 
 function StatCell({ label, value }) {
   return (
-    <div className="flex flex-col items-center py-4">
-      <p className="font-serif text-2xl leading-none text-cream">{value}</p>
-      <p className="label-mono mt-1.5 !text-[10px] text-cream/35">{label}</p>
+    <div className="card flex flex-col items-center rounded-2xl py-4">
+      <p className="font-serif text-[26px] font-semibold leading-none text-cream">{value}</p>
+      <p className="label-mono mt-2 !text-[9.5px] text-cream/35">{label}</p>
     </div>
   );
 }
@@ -274,6 +306,16 @@ export default function EventDashboard() {
     } catch { toast.error('Erro.'); }
   }
 
+  async function handleShare() {
+    const url = `${window.location.origin}/e/${event.slug}`;
+    const text = `✨ Você foi convidado para "${event.name}"!\nAcesse e tire suas fotos: ${url}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: event.name, text, url }); } catch { /* cancelado */ }
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    }
+  }
+
   async function downloadZip() {
     const toastId = toast.loading('Gerando ZIP…');
     try {
@@ -302,13 +344,25 @@ export default function EventDashboard() {
   return (
     <div className="app-screen flex flex-col text-cream">
       <header className="app-topbar glass sticky top-0 z-20">
-        <div className="mx-auto flex min-h-[56px] max-w-3xl items-center gap-2 px-3 sm:hidden">
-          <Link to="/dashboard" className="icon-button" aria-label="Voltar para eventos">
-            <ChevronLeft size={19} />
+        <div className="mx-auto flex min-h-[60px] max-w-3xl items-center gap-3 px-3 py-1.5 sm:hidden">
+          <Link to="/dashboard" aria-label="Voltar para eventos"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-cream-dim transition hover:text-cream">
+            <ChevronLeft size={18} />
           </Link>
-          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-cream">{event.name}</p>
-          <button type="button" className="icon-button" onClick={() => setMobileActionsOpen(true)} aria-label="Mais ações do evento">
-            <MoreHorizontal size={20} />
+          <div className="min-w-0 flex-1">
+            <p className="flex items-center gap-1.5 font-serif text-[17px] font-semibold leading-tight text-cream">
+              {(() => { const { Icon, cls } = TYPE_META[event.type] || TYPE_META.outro; return <Icon size={15} className={`shrink-0 ${cls}`} fill="currentColor" strokeWidth={1.5} />; })()}
+              <span className="truncate">{event.name}</span>
+            </p>
+            <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-cream/40">
+              <span className={`h-1.5 w-1.5 rounded-full ${(STATUS_META[event.status] || STATUS_META.draft).dot}`} />
+              <span className="font-medium text-cream/60">{(STATUS_META[event.status] || STATUS_META.draft).label}</span>
+              <span>· {TYPE_LABEL[event.type] || 'Evento'}</span>
+            </p>
+          </div>
+          <button type="button" onClick={() => setMobileActionsOpen(true)} aria-label="Mais ações do evento"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-cream-dim transition hover:text-cream">
+            <MoreHorizontal size={19} />
           </button>
         </div>
         <div className="mx-auto hidden max-w-3xl flex-wrap items-center gap-x-1.5 gap-y-1 px-4 py-2.5 sm:flex sm:px-6">
@@ -358,7 +412,7 @@ export default function EventDashboard() {
               Pagar e ativar
             </button>
           )}
-          {event.status === 'active' && (
+          {(event.status === 'active' || (event.status === 'revealed' && event.isAcceptingPhotos)) && (
             <button disabled={acting} onClick={handleClose} className="btn-ghost btn-sm" title="Encerrar">
               <Lock size={14} />
               <span className="hidden sm:inline">Encerrar</span>
@@ -397,7 +451,7 @@ export default function EventDashboard() {
               <Monitor size={18} className="text-gold" /> Abrir telão
             </a>
           )}
-          {event.status === 'active' && (
+          {(event.status === 'active' || (event.status === 'revealed' && event.isAcceptingPhotos)) && (
             <button type="button" disabled={acting} onClick={handleClose} className="flex min-h-12 w-full items-center gap-3 rounded-2xl border border-line bg-white/[0.025] px-4 text-sm font-semibold text-cream">
               <Lock size={18} className="text-warning" /> Encerrar evento
             </button>
@@ -409,17 +463,17 @@ export default function EventDashboard() {
       </MobileActionSheet>
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5 sm:px-6 sm:py-6">
-        {/* Título — agrupado com badge e tipo na mesma linha */}
-        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 sm:mb-5">
-          <h1 className="font-serif text-2xl font-semibold tracking-tight sm:text-3xl">{event.name}</h1>
+        {/* Título — no mobile ele vive no cabeçalho; aqui só no desktop */}
+        <div className="mb-5 hidden flex-wrap items-center gap-x-3 gap-y-1.5 sm:flex">
+          <h1 className="font-serif text-3xl font-semibold tracking-tight">{event.name}</h1>
           <StatusBadge status={event.status} />
           <span className="label-mono !text-[10px] text-cream/35">{TYPE_LABEL[event.type] || 'Evento'}</span>
         </div>
 
         {/* Countdowns */}
-        {(event.status === 'active' || event.status === 'closed') && (
+        {(event.status === 'active' || event.status === 'closed' || event.isAcceptingPhotos) && (
           <div className="mb-3 grid gap-2 sm:grid-cols-2">
-            {event.endsAt && event.status === 'active' && (
+            {event.endsAt && event.isAcceptingPhotos && (
               <CountdownPanel label="Encerramento em" target={event.endsAt} />
             )}
             {event.revealAt && !event.isRevealed && (
@@ -428,23 +482,28 @@ export default function EventDashboard() {
           </div>
         )}
 
-        {/* Stats — agrupados num único card com divisores */}
-        <div className="card mb-3 grid grid-cols-3 divide-x divide-line/50">
+        {/* Stats — três cartões separados, números grandes (mockup) */}
+        <div className="mb-3 grid grid-cols-3 gap-2">
           <StatCell label="Convidados" value={guestCount} />
           <StatCell label="Fotos" value={photoCount} />
           <StatCell label="Por pessoa" value={perPerson} />
         </div>
 
-        {/* Tabs — contagens só aparecem em telas maiores */}
-        <div className="mb-4 flex gap-1 rounded-xl border border-line bg-surface p-1 sm:mb-5" role="tablist" aria-label="Seções do evento">
-          {[['overview', 'Geral', 'Visão geral'], ['photos', 'Fotos', `Fotos · ${photoCount}`], ['guests', 'Convid.', `Convidados · ${guestCount}`], ['qr', 'QR', 'QR Code']].map(([key, short, full]) => (
+        {/* Tabs — pills roláveis com badge de contagem (mockup) */}
+        <div className="scrollbar-hide mb-4 flex gap-2 overflow-x-auto pb-1 sm:mb-5" role="tablist" aria-label="Seções do evento">
+          {[['overview', 'Visão geral', null], ['photos', 'Fotos', photoCount], ['guests', 'Convidados', guestCount], ['qr', 'QR Code', null]].map(([key, label, count]) => (
             <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)}
-              className={`min-h-11 min-w-0 flex-1 truncate rounded-lg px-1 py-2 text-xs font-medium transition-all duration-200 sm:text-[13px] ${
+              className={`flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-4 text-[13px] font-semibold transition-all duration-200 ${
                 tab === key
-                  ? 'bg-gold text-[#1c160c] shadow-[0_4px_16px_-4px_rgba(196,169,108,0.5)]'
-                  : 'text-cream-dim hover:bg-gold/[0.05] hover:text-cream'}`}>
-              <span className="sm:hidden">{short}</span>
-              <span className="hidden sm:inline">{full}</span>
+                  ? 'border-gold bg-gold text-[#1c160c] shadow-[0_4px_16px_-4px_rgba(196,169,108,0.5)]'
+                  : 'border-line bg-surface text-cream-dim hover:border-gold/30 hover:text-cream'}`}>
+              {label}
+              {count != null && count > 0 && (
+                <span className={`rounded-full px-1.5 py-px text-[10px] font-bold ${
+                  tab === key ? 'bg-black/15' : 'bg-white/[0.08] text-cream/60'}`}>
+                  {count}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -452,19 +511,27 @@ export default function EventDashboard() {
         {/* Visão geral */}
         {tab === 'overview' && (
           <div className="animate-fadein space-y-3">
-            {/* Link */}
+            {/* Link do evento — campo + Copiar dourado, QR Code e Compartilhar (mockup) */}
             <div className="card p-4">
-              <p className="label-mono mb-2 !text-[10px] text-cream/35">Link do evento</p>
-              <div className="flex flex-wrap items-center gap-2">
-                <code className="min-w-0 flex-1 truncate rounded-lg border border-line/60 bg-black/40 px-3 py-2 font-mono text-[13px] text-cream/80">{guestUrl}</code>
+              <p className="label-mono mb-3 !text-[10px] text-cream/35">Link do evento</p>
+              <div className="flex items-stretch gap-2">
+                <code className="flex min-w-0 flex-1 items-center truncate rounded-xl border border-line/60 bg-black/40 px-3 py-2.5 font-mono text-[12px] text-cream/80">
+                  {(() => { const u = guestUrl.replace(/^https?:\/\//, ''); return u.length > 30 ? `…${u.slice(-28)}` : u; })()}
+                </code>
                 <button onClick={() => { navigator.clipboard.writeText(guestUrl); toast.success('Link copiado!'); }}
-                  className="btn-ghost btn-sm">
-                  <Copy size={13} />
+                  className="flex shrink-0 items-center gap-1.5 rounded-xl bg-gold px-4 text-[13px] font-bold text-[#1c160c] transition hover:brightness-105 active:scale-[0.97]">
+                  <Copy size={14} />
                   Copiar
                 </button>
-                <button onClick={() => setTab('qr')} className="btn-ghost btn-sm">
-                  <QrCode size={13} />
+              </div>
+              <div className="mt-2.5 flex gap-2">
+                <button onClick={() => setTab('qr')} className="btn-ghost h-11 min-h-11 flex-1 rounded-full text-[13px]">
+                  <QrCode size={15} />
                   QR Code
+                </button>
+                <button onClick={handleShare} className="btn-ghost h-11 min-h-11 flex-1 rounded-full text-[13px]">
+                  <Share2 size={15} />
+                  Compartilhar
                 </button>
               </div>
             </div>
@@ -476,30 +543,40 @@ export default function EventDashboard() {
                 {recentGuests.length === 0 ? (
                   <p className="text-[13px] text-cream/35">Ninguém entrou ainda.</p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {recentGuests.map((g) => (
-                      <div key={g.id} className="flex items-center justify-between">
-                        <span className="text-[13px] text-cream/80">{g.nickname || 'Anônimo'}</span>
-                        <span className="font-mono text-[11px] tracking-wider text-cream-dim/80">{g.photoCount ?? 0} fotos</span>
+                      <div key={g.id} className="flex items-center gap-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line bg-white/[0.05] font-serif text-[13px] font-semibold text-cream/85">
+                          {(g.nickname || 'A').trim().charAt(0).toUpperCase()}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[13px] font-semibold leading-tight text-cream">{g.nickname || 'Anônimo'}</p>
+                          <p className="mt-0.5 text-[11px] text-cream/35">{timeAgo(g.createdAt)}</p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-white/[0.07] px-2.5 py-1 text-[11px] font-medium text-cream/60">
+                          {g.photoCount ?? 0} fotos
+                        </span>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              <div className="card space-y-2 p-4">
-                <p className="label-mono !text-[10px] text-cream/35">Detalhes</p>
-                {[
-                  ['Tipo', TYPE_LABEL[event.type] || event.type],
-                  ['Fotos por convidado', event.photoLimitPerGuest === 0 ? 'Ilimitado' : (event.photoLimitPerGuest ?? 10)],
-                  ['Criado em', createdAt],
-                  ['Revelação', event.revealAt ? new Date(event.revealAt).toLocaleString('pt-BR') : 'Manual'],
-                ].map(([k, v]) => (
-                  <div key={k} className="flex justify-between gap-3 text-[13px]">
-                    <span className="shrink-0 text-cream/40">{k}</span>
-                    <span className="truncate text-right text-cream/80">{v}</span>
-                  </div>
-                ))}
+              <div className="card p-4">
+                <p className="label-mono mb-1 !text-[10px] text-cream/35">Detalhes</p>
+                <div className="divide-y divide-line/40">
+                  {[
+                    ['Tipo', TYPE_LABEL[event.type] || event.type],
+                    ['Fotos por convidado', event.photoLimitPerGuest === 0 ? 'Ilimitado' : (event.photoLimitPerGuest ?? 10)],
+                    ['Criado em', createdAt],
+                    ['Revelação', event.revealAt ? new Date(event.revealAt).toLocaleString('pt-BR') : 'Imediata'],
+                  ].map(([k, v]) => (
+                    <div key={k} className="flex items-center justify-between gap-3 py-2.5 text-[13px]">
+                      <span className="shrink-0 text-gold/55">{k}</span>
+                      <span className="truncate text-right font-semibold text-cream">{v}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 

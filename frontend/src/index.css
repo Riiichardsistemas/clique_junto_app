@@ -417,52 +417,34 @@
   }
 }
 
-/* Em celulares deitados, a câmera vira uma interface em dois painéis:
-   visor à esquerda, cluster de controles vira painel lateral à direita. */
+/* Em celulares deitados, a câmera vira dois painéis: barra no topo,
+   visor à esquerda e painel de controles à direita. */
 @media (orientation: landscape) and (max-height: 500px) {
-  .camera-app { --camera-panel: clamp(264px, 38vw, 320px); }
-
-  .camera-viewfinder { right: var(--camera-panel); }
-
-  .camera-bar {
-    right: var(--camera-panel);
-    padding-right: 1rem;
-    padding-left: 1rem;
+  .camera-app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) clamp(250px, 34vw, 310px);
   }
 
-  .camera-brackets { display: none; }
+  .camera-bar { grid-column: 1 / -1; }
+
+  .camera-viewfinder {
+    grid-row: 2;
+    grid-column: 1;
+    margin: 0 0 max(.5rem, env(safe-area-inset-bottom)) max(.5rem, env(safe-area-inset-left));
+  }
 
   .camera-bottom {
-    top: 0;
-    bottom: 0;
-    left: auto;
     display: flex;
     flex-direction: column;
+    grid-row: 2;
+    grid-column: 2;
     justify-content: center;
-    width: var(--camera-panel);
-    padding-top: .75rem;
-    border-left: 1px solid rgba(246, 238, 221, .06);
-    background-color: rgba(10, 10, 11, .94);
-    background-image: none;
+    min-height: 0;
+    padding-bottom: max(.5rem, env(safe-area-inset-bottom));
   }
 
   .camera-filter-strip { min-width: 0; }
-
-  .camera-mode-switcher { padding-top: .625rem; }
-
-  .camera-controls {
-    padding: 1rem 1.25rem max(.75rem, env(safe-area-inset-bottom));
-  }
-
-  .camera-controls > button:nth-of-type(2) {
-    width: 4.25rem;
-    height: 4.25rem;
-  }
-
-  .camera-controls > button:nth-of-type(2) > span {
-    width: 3.25rem;
-    height: 3.25rem;
-  }
 }
 
 @media (hover: hover) {

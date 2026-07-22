@@ -69,8 +69,11 @@ module.exports = (sequelize) => {
   );
 
   // Helpers de estado (em tempo real, baseados nas datas)
+  // Revelação NÃO bloqueia envio: convidados seguem fotografando até o término
+  // do evento (endsAt ou encerramento manual) ou até esgotar a capacidade
+  // contratada (validada no upload).
   Event.prototype.isAcceptingPhotos = function () {
-    if (this.status !== EVENT_STATUS.ACTIVE) return false;
+    if (this.status !== EVENT_STATUS.ACTIVE && this.status !== EVENT_STATUS.REVEALED) return false;
     const now = new Date();
     if (this.startsAt && now < new Date(this.startsAt)) return false;
     if (this.endsAt && now > new Date(this.endsAt)) return false;
@@ -79,8 +82,10 @@ module.exports = (sequelize) => {
 
   Event.prototype.isRevealed = function () {
     if (this.status === EVENT_STATUS.REVEALED) return true;
-    if (this.revealAt && new Date() >= new Date(this.revealAt)) return true;
-    return false;
+    if (this.status === EVENT_STATUS.DRAFT) return false;
+    // Sem data de revelação → álbum aberto e visível desde o início
+    if (!this.revealAt) return true;
+    return new Date() >= new Date(this.revealAt);
   };
 
   return Event;

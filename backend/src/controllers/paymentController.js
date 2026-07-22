@@ -19,6 +19,22 @@ function frontBase() {
   return (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].replace(/\/$/, '');
 }
 
+// Retorna o CPF/CNPJ (so digitos) do organizador. Se o perfil ainda nao tem e
+// veio um valido no corpo da requisicao, salva no perfil para os proximos usos.
+async function ensureUserCpfCnpj(req) {
+  const existing = String(req.user.cpfCnpj || '').replace(/\D/g, '');
+  const provided = String(req.body.cpfCnpj || '').replace(/\D/g, '');
+  const digits = existing || provided;
+  if (!digits || (digits.length !== 11 && digits.length !== 14)) {
+    return existing && (existing.length === 11 || existing.length === 14) ? existing : null;
+  }
+  if (!existing && provided) {
+    req.user.cpfCnpj = provided;
+    await req.user.save().catch(() => {});
+  }
+  return digits;
+}
+
 // POST /api/payments/checkout  (organizador) — cria cobrança e devolve o link
 async function checkout(req, res, next) {
   try {
@@ -62,11 +78,15 @@ async function checkout(req, res, next) {
 
     // ---------- MODO REAL (Asaas) ----------
     if (asaas.useAsaas) {
+      const cpfCnpj = await ensureUserCpfCnpj(req);
+      if (!cpfCnpj) {
+        return res.status(400).json({ error: 'Para gerar a cobranca, informe seu CPF ou CNPJ.', needCpf: true });
+      }
       try {
         const customerId = await asaas.ensureCustomer({
           name: req.user.name,
           email: req.user.email,
-          cpfCnpj: req.user.cpfCnpj || req.body.cpfCnpj,
+          cpfCnpj,
         });
 
         if (!payment) {
@@ -265,13 +285,23 @@ async function pixCheckout(req, res, next) {
     const target = await loadPaidTarget(req, res);
     if (!target) return;
     const { event, plan } = target;
+
+    // Asaas exige CPF/CNPJ do cliente. Persiste no perfil se veio no corpo.
+    const cpfCnpj = await ensureUserCpfCnpj(req);
+    if (asaas.useAsaas && !cpfCnpj) {
+      return res.status(400).json({
+        error: 'Para gerar o Pix, informe seu CPF ou CNPJ.',
+        needCpf: true,
+      });
+    }
+
     const payment = await getOrCreatePending(event, plan, asaas.useAsaas ? 'asaas' : 'mock');
     const description = `Clique Junto — ${plan.label} — evento "${event.name}"`;
 
     if (asaas.useAsaas) {
       try {
         const customerId = await asaas.ensureCustomer({
-          name: req.user.name, email: req.user.email, cpfCnpj: req.user.cpfCnpj || req.body.cpfCnpj,
+          name: req.user.name, email: req.user.email, cpfCnpj,
         });
         const charge = await asaas.createPixCharge({
           customerId, amountCents: plan.priceCents, description, externalReference: payment.id,
@@ -311,6 +341,12 @@ async function cardCheckout(req, res, next) {
     if (!target) return;
     const { event, plan } = target;
     const { card, holderInfo } = req.body;
+
+    // Aproveita o CPF/CNPJ do titular para salvar no perfil (reuso no Pix).
+    if (holderInfo && holderInfo.cpfCnpj && !req.user.cpfCnpj) {
+      const d = String(holderInfo.cpfCnpj).replace(/\D/g, '');
+      if (d.length === 11 || d.length === 14) { req.user.cpfCnpj = d; await req.user.save().catch(() => {}); }
+    }
 
     // Validação básica dos campos do cartão
     const need = card && card.holderName && card.number && card.expiryMonth && card.expiryYear && card.ccv;

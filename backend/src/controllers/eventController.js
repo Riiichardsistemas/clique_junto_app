@@ -75,7 +75,8 @@ async function create(req, res, next) {
       type: type || 'outro',
       startsAt: startsAt || null,
       endsAt: endsAt || null,
-      revealAt: revealAt || endsAt || null,
+      // Sem data de revelação → álbum aberto desde o início (sem fallback p/ endsAt)
+      revealAt: revealAt || null,
       photoLimitPerGuest: photoLimitPerGuest != null ? Number(photoLimitPerGuest) : 10,
       defaultFilter: defaultFilter || 'nenhum',
       isPrivate: !!isPrivate,
@@ -155,9 +156,8 @@ async function close(req, res, next) {
   try {
     const event = await loadOwned(req, res);
     if (!event) return;
-    if (event.status === EVENT_STATUS.REVEALED) {
-      return res.status(400).json({ error: 'Evento ja revelado.' });
-    }
+    // Revelado também pode ser encerrado: para de aceitar fotos sem esconder o álbum
+    // (isRevealed continua true pelo revealAt já passado ou nulo).
     event.status = EVENT_STATUS.CLOSED;
     event.endsAt = new Date();
     await event.save();

@@ -7,11 +7,21 @@ import {
 } from 'lucide-react';
 import { paymentApi } from '../../api/paymentApi';
 import { eventApi } from '../../api/eventApi';
+import { authApi } from '../../api/authApi';
 import { getPlan, formatBRL, isCustomPlan } from '../../utils/plans';
 import { useAuth } from '../../contexts/AuthContext';
 import PageLoader from '../../components/ui/PageLoader';
 
 const CONTACT_EMAIL = 'contato@papelariabaldasso.com.br';
+
+// Mascara CPF (000.000.000-00) ou CNPJ (00.000.000/0000-00) conforme o tamanho.
+function maskCpfCnpj(v) {
+  const d = String(v || '').replace(/\D/g, '').slice(0, 14);
+  if (d.length <= 11) {
+    return d.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+  }
+  return d.replace(/(\d{2})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1/$2').replace(/(\d{4})(\d{1,2})$/, '$1-$2');
+}
 
 const onlyDigits = (v) => String(v || '').replace(/\D/g, '');
 
@@ -25,6 +35,8 @@ export default function Checkout() {
   const [method, setMethod] = useState(null); // null | 'pix' | 'card'
   const [paid, setPaid] = useState(false);
   const [redeeming, setRedeeming] = useState(false);
+  const [cpfModalOpen, setCpfModalOpen] = useState(false);
+  const [pendingMethod, setPendingMethod] = useState(null);
 
   useEffect(() => {
     eventApi.getOne(id)
@@ -46,6 +58,23 @@ export default function Checkout() {
     setPaid(true);
     toast.success('Pagamento confirmado! Evento ativado.');
     setTimeout(() => navigate(`/events/${id}`), 1400);
+  }
+
+  // Escolhe o meio de pagamento; se faltar CPF/CNPJ no perfil, abre o modal antes.
+  function choose(m) {
+    if (!user?.cpfCnpj) {
+      setPendingMethod(m);
+      setCpfModalOpen(true);
+      return;
+    }
+    setMethod(m);
+  }
+
+  // Chamado pelo modal após salvar o CPF/CNPJ: segue para o método pendente.
+  function onCpfSaved(updatedUser) {
+    if (updatedUser) setUser(updatedUser);
+    setCpfModalOpen(false);
+    if (pendingMethod) { setMethod(pendingMethod); setPendingMethod(null); }
   }
 
   async function redeemCredit() {
@@ -135,7 +164,7 @@ export default function Checkout() {
             {!method && (
               <div className="animate-fadein space-y-3">
                 <p className="mb-1 text-sm text-cream-dim">Escolha como pagar:</p>
-                <button type="button" onClick={() => setMethod('pix')}
+                <button type="button" onClick={() => choose('pix')}
                   className="card card-hover flex w-full items-center gap-4 p-5 text-left">
                   <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-gold/25 bg-gold/10">
                     <QrCode className="h-5 w-5 text-gold" />
@@ -146,7 +175,7 @@ export default function Checkout() {
                   </span>
                   <ChevronLeft className="h-4 w-4 rotate-180 text-cream-dim" />
                 </button>
-                <button type="button" onClick={() => setMethod('card')}
+                <button type="button" onClick={() => choose('card')}
                   className="card card-hover flex w-full items-center gap-4 p-5 text-left">
                   <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-gold/25 bg-gold/10">
                     <CreditCard className="h-5 w-5 text-gold" />
@@ -162,10 +191,11 @@ export default function Checkout() {
 
             {method === 'pix' && (
               <PixPanel eventId={id} planId={event.planId} amountCents={plan?.priceCents}
-                onBack={() => setMethod(null)} onPaid={onPaid} />
+                onBack={() => setMethod(null)} onPaid={onPaid}
+                onNeedCpf={() => { setMethod(null); setPendingMethod('pix'); setCpfModalOpen(true); }} />
             )}
             {method === 'card' && (
-              <CardPanel eventId={id} planId={event.planId}
+              <CardPanel eventId={id} planId={event.planId} defaultCpf={user?.cpfCnpj || ''}
                 onBack={() => setMethod(null)} onPaid={onPaid} />
             )}
             </>
@@ -173,12 +203,75 @@ export default function Checkout() {
           </>
         )}
       </main>
+
+      <CpfModal
+        open={cpfModalOpen}
+        defaultValue={user?.cpfCnpj || ''}
+        onClose={() => { setCpfModalOpen(false); setPendingMethod(null); }}
+        onSaved={onCpfSaved}
+      />
+    </div>
+  );
+}
+
+/* ---------------- Modal de CPF/CNPJ ---------------- */
+function CpfModal({ open, defaultValue, onClose, onSaved }) {
+  const [value, setValue] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { if (open) setValue(maskCpfCnpj(defaultValue)); }, [open, defaultValue]);
+
+  if (!open) return null;
+
+  async function save(e) {
+    e.preventDefault();
+    const digits = value.replace(/\D/g, '');
+    if (digits.length !== 11 && digits.length !== 14) {
+      toast.error('Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const d = await authApi.updateMe({ cpfCnpj: digits });
+      toast.success('Dados salvos.');
+      onSaved(d.user);
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Não foi possível salvar seus dados.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center" role="dialog" aria-modal="true">
+      <form onSubmit={save} className="card w-full max-w-md animate-scalein p-6">
+        <h3 className="text-lg font-semibold text-cream">Dados para pagamento</h3>
+        <p className="mt-1 text-sm text-cream-dim">
+          O Asaas exige seu CPF ou CNPJ para gerar a cobrança. Ele fica salvo no seu perfil para as próximas vezes.
+        </p>
+        <label className="mt-4 mb-1 block text-xs text-cream-dim">CPF ou CNPJ</label>
+        <input
+          className="input-field"
+          inputMode="numeric"
+          autoFocus
+          placeholder="000.000.000-00"
+          aria-label="CPF ou CNPJ"
+          value={value}
+          onChange={(e) => setValue(maskCpfCnpj(e.target.value))}
+        />
+        <div className="mt-5 flex gap-2">
+          <button type="button" onClick={onClose} className="btn-ghost btn-sm flex-1" disabled={saving}>Cancelar</button>
+          <button type="submit" className="btn-primary btn-sm flex-1" disabled={saving}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salvar e continuar'}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
 
 /* ---------------- Pix ---------------- */
-function PixPanel({ eventId, planId, onBack, onPaid }) {
+function PixPanel({ eventId, planId, onBack, onPaid, onNeedCpf }) {
   const [pix, setPix] = useState(null);
   const [paymentId, setPaymentId] = useState(null);
   const [isMock, setIsMock] = useState(false);
@@ -194,7 +287,12 @@ function PixPanel({ eventId, planId, onBack, onPaid }) {
         if (!active) return;
         setPix(d.pix); setPaymentId(d.paymentId); setIsMock(!!d.mock);
       })
-      .catch((e) => active && setError(e?.response?.data?.error || 'Erro ao gerar o Pix.'))
+      .catch((e) => {
+        if (!active) return;
+        // Falta CPF/CNPJ no perfil: pede pelo modal em vez de mostrar erro.
+        if (e?.response?.data?.needCpf && onNeedCpf) { onNeedCpf(); return; }
+        setError(e?.response?.data?.error || 'Erro ao gerar o Pix.');
+      })
       .finally(() => active && setLoading(false));
     return () => { active = false; };
   }, [eventId, planId]);
@@ -263,10 +361,10 @@ function PixPanel({ eventId, planId, onBack, onPaid }) {
 }
 
 /* ---------------- Cartão ---------------- */
-function CardPanel({ eventId, planId, onBack, onPaid }) {
+function CardPanel({ eventId, planId, onBack, onPaid, defaultCpf = '' }) {
   const [f, setF] = useState({
     holderName: '', number: '', expiry: '', ccv: '',
-    cpfCnpj: '', postalCode: '', addressNumber: '', phone: '',
+    cpfCnpj: maskCpfCnpj(defaultCpf), postalCode: '', addressNumber: '', phone: '',
   });
   const [sending, setSending] = useState(false);
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));

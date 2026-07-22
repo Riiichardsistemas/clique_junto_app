@@ -279,7 +279,9 @@ export default function GuestEntry() {
   if (loading) return <PageLoader label="Carregando convite" />;
   if (notFound) return <NotFound />;
 
-  const isClosed = event?.status === 'closed' || event?.status === 'revealed';
+  // "Encerrado" para o convidado = não aceita mais fotos (revelado ainda aceita,
+  // até o término do evento ou capacidade esgotar). Draft mantém o formulário.
+  const isClosed = event ? event.status !== 'draft' && !event.isAcceptingPhotos : false;
 
   if (event?.entryTemplate === 'convite') {
     return (

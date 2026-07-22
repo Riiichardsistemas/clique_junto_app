@@ -156,6 +156,15 @@ async function updateMe(req, res, next) {
 
     if (name) user.name = String(name).trim();
 
+    // CPF/CNPJ (usado nas cobrancas do Asaas). Guarda somente digitos.
+    if (req.body.cpfCnpj !== undefined) {
+      const digits = String(req.body.cpfCnpj || '').replace(/\D/g, '');
+      if (digits && digits.length !== 11 && digits.length !== 14) {
+        return res.status(400).json({ error: 'CPF ou CNPJ inválido.' });
+      }
+      user.cpfCnpj = digits || null;
+    }
+
     if (email) {
       const normalized = String(email).trim().toLowerCase();
       const conflict = await User.findOne({ where: { email: normalized } });
