@@ -4,6 +4,7 @@ import { LogOut } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { authApi } from '../api/authApi';
+import { setToken } from '../api/axios';
 import AppHeader from '../components/layout/AppHeader';
 
 /* ---------- Ícones ---------- */
@@ -138,7 +139,11 @@ export default function AccountSettings() {
     if (newPassword !== confirmPassword) { toast.error('As senhas não coincidem.'); return; }
     setPasswordSaving(true);
     try {
-      await authApi.updateMe({ currentPassword, password: newPassword });
+      // A troca de senha invalida os tokens antigos no servidor; guarda o novo
+      // token retornado para manter esta sessao ativa.
+      const data = await authApi.updateMe({ currentPassword, password: newPassword });
+      if (data?.token) setToken(data.token);
+      if (data?.user) setUser(data.user);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');

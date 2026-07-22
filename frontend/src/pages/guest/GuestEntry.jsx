@@ -158,7 +158,7 @@ function ConviteEntry({
             <input
               id="invite-nickname" type="text" value={nickname} onChange={(e) => setNickname(e.target.value)}
               placeholder="Como te chamam na festa?" maxLength={40}
-              className="w-full rounded-xl border bg-white/70 px-4 py-3.5 text-[15px] outline-none transition placeholder:text-[#2b241a]/35 focus:bg-white"
+              className="w-full rounded-xl border bg-white/70 px-4 py-3.5 text-base outline-none transition placeholder:text-[#2b241a]/35 focus:bg-white sm:text-[15px]"
               style={{ borderColor: `${ink}26`, color: ink }}
             />
 
@@ -168,7 +168,7 @@ function ConviteEntry({
             <input
               id="invite-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email"
               placeholder="voce@email.com"
-              className="w-full rounded-xl border bg-white/70 px-4 py-3.5 text-[15px] outline-none transition placeholder:text-[#2b241a]/35 focus:bg-white"
+              className="w-full rounded-xl border bg-white/70 px-4 py-3.5 text-base outline-none transition placeholder:text-[#2b241a]/35 focus:bg-white sm:text-[15px]"
               style={{ borderColor: `${ink}26`, color: ink }}
             />
 
@@ -381,7 +381,7 @@ export default function GuestEntry() {
               <div>
                 <label htmlFor="guest-nickname" className="mb-1.5 block text-sm font-medium text-cream-dim">Seu nome</label>
                 <input id="guest-nickname" type="text" value={nickname} onChange={(e) => setNickname(e.target.value)}
-                  placeholder="Como quer ser chamado?" className="input-field" maxLength={40} autoFocus />
+                  placeholder="Como quer ser chamado?" className="input-field" maxLength={40} />
               </div>
 
               <div>

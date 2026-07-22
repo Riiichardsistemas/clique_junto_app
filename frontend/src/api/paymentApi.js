@@ -8,6 +8,10 @@ export const paymentApi = {
   checkout: (eventId, planId, extra = {}) =>
     api.post('/payments/checkout', { eventId, planId, ...extra }).then((r) => r.data),
 
+  // Ativa o evento usando o saldo de créditos do organizador (concedido pelo admin)
+  credit: (eventId, planId) =>
+    api.post('/payments/credit', { eventId, planId }).then((r) => r.data),
+
   // Pix no app: devolve { paymentId, pix: { encodedImage, payload }, amountCents }
   pix: (eventId, planId, extra = {}) =>
     api.post('/payments/pix', { eventId, planId, ...extra }).then((r) => r.data),

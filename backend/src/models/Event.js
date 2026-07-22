@@ -34,6 +34,8 @@ module.exports = (sequelize) => {
       // Plano / pagamento
       planId: { type: DataTypes.STRING, allowNull: false, defaultValue: 'free' },
       maxGuests: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 5 },
+      // Capacidade de memorias (fotos/videos) do album conforme o plano. 0 = ilimitado.
+      maxPhotos: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 50 },
       isPaid: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
       pricePaidCents: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
       // Recap

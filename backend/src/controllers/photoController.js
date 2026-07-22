@@ -29,6 +29,13 @@ async function getUploadUrl(req, res, next) {
     if (event.photoLimitPerGuest > 0 && guest.photoCount >= event.photoLimitPerGuest) {
       return res.status(403).json({ error: 'Voce ja usou todas as suas fotos.' });
     }
+    // Capacidade total do album (conforme o plano). 0 = ilimitado.
+    if (event.maxPhotos > 0) {
+      const eventPhotoCount = await Photo.count({ where: { eventId: event.id } });
+      if (eventPhotoCount >= event.maxPhotos) {
+        return res.status(403).json({ error: 'Este álbum atingiu a capacidade máxima de memórias do plano.' });
+      }
+    }
 
     const { fileName, fileType, mediaType } = req.body;
     const isVideo = mediaType === 'video';
@@ -81,6 +88,13 @@ async function create(req, res, next) {
     }
     if (event.photoLimitPerGuest > 0 && guest.photoCount >= event.photoLimitPerGuest) {
       return res.status(403).json({ error: 'Voce ja usou todas as suas fotos.' });
+    }
+    // Capacidade total do album (conforme o plano). 0 = ilimitado.
+    if (event.maxPhotos > 0) {
+      const eventPhotoCount = await Photo.count({ where: { eventId: event.id } });
+      if (eventPhotoCount >= event.maxPhotos) {
+        return res.status(403).json({ error: 'Este álbum atingiu a capacidade máxima de memórias do plano.' });
+      }
     }
 
     const { storageKey, filter, mediaType, durationSeconds } = req.body;

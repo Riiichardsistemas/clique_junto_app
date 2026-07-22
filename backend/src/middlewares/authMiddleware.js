@@ -17,7 +17,7 @@ async function authMiddleware(req, res, next) {
 
     let payload;
     try {
-      payload = jwt.verify(token, process.env.JWT_SECRET);
+      payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
     } catch (e) {
       return res.status(401).json({ error: 'Token invalido ou expirado.' });
     }
@@ -32,6 +32,10 @@ async function authMiddleware(req, res, next) {
     }
     if (!user.isActive) {
       return res.status(401).json({ error: 'Esta conta esta desativada.' });
+    }
+    // Revogacao: um token emitido antes da ultima troca/reset de senha e invalido.
+    if ((payload.v || 0) !== (user.tokenVersion || 0)) {
+      return res.status(401).json({ error: 'Sessao expirada. Faca login novamente.' });
     }
 
     req.user = user;

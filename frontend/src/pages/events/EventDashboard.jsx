@@ -300,7 +300,7 @@ export default function EventDashboard() {
   const recentGuests = [...guests].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
 
   return (
-    <div className="app-screen pb-24 text-cream sm:pb-0">
+    <div className="app-screen flex flex-col text-cream">
       <header className="app-topbar glass sticky top-0 z-20">
         <div className="mx-auto flex min-h-[56px] max-w-3xl items-center gap-2 px-3 sm:hidden">
           <Link to="/dashboard" className="icon-button" aria-label="Voltar para eventos">
@@ -408,7 +408,7 @@ export default function EventDashboard() {
         </div>
       </MobileActionSheet>
 
-      <main className="mx-auto max-w-3xl px-4 py-5 sm:px-6 sm:py-6">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5 sm:px-6 sm:py-6">
         {/* Título — agrupado com badge e tipo na mesma linha */}
         <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 sm:mb-5">
           <h1 className="font-serif text-2xl font-semibold tracking-tight sm:text-3xl">{event.name}</h1>
@@ -668,7 +668,8 @@ export default function EventDashboard() {
         )}
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-ink/90 px-4 pt-3 backdrop-blur-xl sm:hidden" style={{ paddingBottom: 'max(.75rem, env(safe-area-inset-bottom))' }}>
+      {/* Sticky (e não fixed): ver comentário em .mobile-action-bar no index.css */}
+      <div className="sticky bottom-0 z-30 border-t border-line bg-ink/90 px-4 pt-3 backdrop-blur-xl sm:hidden" style={{ paddingBottom: 'max(.75rem, env(safe-area-inset-bottom))' }}>
         {event.status === 'draft' && event.isPaid && (
           <button disabled={acting} onClick={handlePublish} className="btn-primary w-full"><Rocket size={17} /> Publicar evento</button>
         )}
@@ -688,7 +689,7 @@ export default function EventDashboard() {
         <div className="dialog-backdrop animate-fadein"
           onClick={() => setEditOpen(false)}>
           <form onSubmit={handleSaveEdit}
-            className="dialog-panel max-h-[90vh] overflow-y-auto"
+            className="dialog-panel max-h-[90dvh] overflow-y-auto"
             role="dialog" aria-modal="true" aria-labelledby="edit-event-title"
             onClick={(e) => e.stopPropagation()}>
             <div className="mb-5 flex items-center justify-between">

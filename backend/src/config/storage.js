@@ -13,7 +13,9 @@ const crypto = require('crypto');
  *   reais (requer os pacotes @aws-sdk/client-s3 e @aws-sdk/s3-request-presigner).
  */
 
-const useS3 = !!process.env.AWS_BUCKET_NAME;
+// Aceita tanto os nomes AWS_* quanto os aliases R2_* (Cloudflare R2).
+const BUCKET = process.env.AWS_BUCKET_NAME || process.env.R2_BUCKET || '';
+const useS3 = !!BUCKET;
 const defaultUploadsDir = path.join(__dirname, '..', '..', 'uploads');
 const UPLOADS_DIR = path.resolve(
   process.env.UPLOADS_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || defaultUploadsDir
@@ -35,17 +37,28 @@ function buildKey(eventId, fileName) {
   return `events/${eventId}/${Date.now()}-${rand}${ext}`;
 }
 
-// --- S3 (lazy) ---
+// --- S3 / Cloudflare R2 (lazy) ---
+// R2 e compativel com S3, mas exige um endpoint proprio
+// (https://<accountid>.r2.cloudflarestorage.com) e region 'auto'.
 let _s3;
 function getS3() {
   if (_s3) return _s3;
   // eslint-disable-next-line global-require
   const { S3Client } = require('@aws-sdk/client-s3');
+  // Endpoint: aceita S3_ENDPOINT ou R2_ENDPOINT; se so houver R2_ACCOUNT_ID, monta a URL do R2.
+  const endpoint = process.env.S3_ENDPOINT
+    || process.env.R2_ENDPOINT
+    || (process.env.R2_ACCOUNT_ID ? `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : undefined);
   _s3 = new S3Client({
-    region: process.env.AWS_REGION,
+    // R2 usa a regiao 'auto'. Se um endpoint foi informado e AWS_REGION esta vazio,
+    // assume 'auto' automaticamente.
+    region: process.env.AWS_REGION || (endpoint ? 'auto' : undefined),
+    endpoint,
+    // R2 aceita virtual-hosted por padrao; permite forcar path-style se necessario.
+    forcePathStyle: String(process.env.S3_FORCE_PATH_STYLE || '').toLowerCase() === 'true',
     credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || process.env.R2_SECRET_ACCESS_KEY,
     },
   });
   return _s3;
@@ -70,7 +83,7 @@ const storage = {
       // eslint-disable-next-line global-require
       const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
       const cmd = new PutObjectCommand({
-        Bucket: process.env.AWS_BUCKET_NAME,
+        Bucket: BUCKET,
         Key: key,
         ContentType: fileType,
       });
@@ -97,7 +110,7 @@ const storage = {
       // eslint-disable-next-line global-require
       const { PutObjectCommand } = require('@aws-sdk/client-s3');
       await getS3().send(new PutObjectCommand({
-        Bucket: process.env.AWS_BUCKET_NAME,
+        Bucket: BUCKET,
         Key: key,
         Body: buffer,
         ContentType: contentType,
@@ -130,7 +143,7 @@ const storage = {
       const { GetObjectCommand } = require('@aws-sdk/client-s3');
       // eslint-disable-next-line global-require
       const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
-      const cmd = new GetObjectCommand({ Bucket: process.env.AWS_BUCKET_NAME, Key: key });
+      const cmd = new GetObjectCommand({ Bucket: BUCKET, Key: key });
       return getSignedUrl(getS3(), cmd, { expiresIn: 24 * 60 * 60 });
     }
     const base = (appUrl || process.env.APP_URL || 'http://localhost:4000').replace(/\/$/, '');
@@ -147,7 +160,7 @@ const storage = {
       // eslint-disable-next-line global-require
       const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
       await getS3().send(
-        new DeleteObjectCommand({ Bucket: process.env.AWS_BUCKET_NAME, Key: key })
+        new DeleteObjectCommand({ Bucket: BUCKET, Key: key })
       );
       return;
     }

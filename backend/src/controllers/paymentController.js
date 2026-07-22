@@ -1,6 +1,6 @@
-const { Event, Plan, User } = require('../models');
+const { Event, Plan, User, sequelize } = require('../models');
 const { EVENT_STATUS } = require('../config/constants');
-const { getPlan } = require('../config/plans');
+const { getPlan, isCustomPlan } = require('../config/plans');
 const { sendMail } = require('../config/mailer');
 const templates = require('../utils/emailTemplates');
 const asaas = require('../config/asaas');
@@ -29,10 +29,19 @@ async function checkout(req, res, next) {
     const plan = getPlan(planId || event.planId);
     if (!plan) return res.status(400).json({ error: 'Plano invalido.' });
 
+    // Plano personalizado (sob consulta): nao entra no checkout automatico.
+    if (isCustomPlan(plan)) {
+      return res.status(400).json({
+        error: 'Este plano é sob consulta. Fale com a gente para liberar seu evento.',
+        custom: true,
+      });
+    }
+
     // Plano gratuito: ativa direto, sem cobrança
     if (plan.priceCents === 0) {
       event.planId = plan.id;
       event.maxGuests = plan.maxGuests;
+      event.maxPhotos = plan.capacity != null ? plan.capacity : 0;
       event.isPaid = true;
       event.status = EVENT_STATUS.ACTIVE;
       await event.save();
@@ -48,6 +57,7 @@ async function checkout(req, res, next) {
     // Atualiza o plano escolhido no evento (ainda não pago)
     event.planId = plan.id;
     event.maxGuests = plan.maxGuests;
+    event.maxPhotos = plan.capacity != null ? plan.capacity : 0;
     await event.save();
 
     // ---------- MODO REAL (Asaas) ----------
@@ -175,8 +185,14 @@ async function paymentStatus(req, res, next) {
 // Configurado em Asaas > Integrações > Webhooks, com um token em asaas-access-token.
 async function webhook(req, res) {
   try {
-    // Validação do token do webhook (defina ASAAS_WEBHOOK_TOKEN e o mesmo no painel Asaas)
+    // Validação do token do webhook (defina ASAAS_WEBHOOK_TOKEN e o mesmo no painel Asaas).
+    // O token e OBRIGATORIO quando o gateway real esta ativo: sem ele, qualquer um
+    // poderia liberar um evento pago via POST. Recusa a requisicao se nao configurado.
     const expected = process.env.ASAAS_WEBHOOK_TOKEN;
+    if (asaas.useAsaas && !expected) {
+      console.error('[payments] webhook recebido sem ASAAS_WEBHOOK_TOKEN configurado — recusado.');
+      return res.status(503).json({ error: 'webhook not configured' });
+    }
     if (expected) {
       const got = req.headers['asaas-access-token'];
       if (got !== expected) return res.status(401).json({ error: 'unauthorized' });
@@ -220,10 +236,12 @@ async function loadPaidTarget(req, res) {
   if (!event) { res.status(404).json({ error: 'Evento nao encontrado.' }); return null; }
   const plan = getPlan(planId || event.planId);
   if (!plan) { res.status(400).json({ error: 'Plano invalido.' }); return null; }
+  if (isCustomPlan(plan)) { res.status(400).json({ error: 'Este plano é sob consulta. Fale com a gente para liberar seu evento.', custom: true }); return null; }
   if (plan.priceCents === 0) { res.status(400).json({ error: 'Plano gratuito nao requer pagamento.' }); return null; }
   // Fixa o plano escolhido no evento (ainda nao pago)
   event.planId = plan.id;
   event.maxGuests = plan.maxGuests;
+  event.maxPhotos = plan.capacity != null ? plan.capacity : 0;
   await event.save();
   return { event, plan };
 }
@@ -347,6 +365,78 @@ async function cardCheckout(req, res, next) {
   }
 }
 
+// POST /api/payments/credit (organizador) — ativa o evento usando o saldo de
+// creditos concedido pelo super-admin. So funciona quando o saldo cobre o plano.
+async function payWithCredit(req, res, next) {
+  try {
+    const { eventId, planId } = req.body;
+    const event = await Event.findOne({ where: { id: eventId, userId: req.user.id } });
+    if (!event) return res.status(404).json({ error: 'Evento nao encontrado.' });
+
+    const plan = getPlan(planId || event.planId);
+    if (!plan) return res.status(400).json({ error: 'Plano invalido.' });
+    if (isCustomPlan(plan)) {
+      return res.status(400).json({ error: 'Este plano é sob consulta e não pode ser pago com créditos.' });
+    }
+    if (plan.priceCents === 0) {
+      return res.status(400).json({ error: 'Plano gratuito nao requer creditos.' });
+    }
+    if (event.isPaid && event.status !== EVENT_STATUS.DRAFT) {
+      return res.status(400).json({ error: 'Este evento ja esta ativo.' });
+    }
+
+    // Recarrega o usuario para pegar o saldo mais recente (evita corrida).
+    const result = await sequelize.transaction(async (t) => {
+      const user = await User.findByPk(req.user.id, { transaction: t, lock: t.LOCK.UPDATE });
+      const price = plan.priceCents;
+      if ((user.creditCents || 0) < price) {
+        const err = new Error('Créditos insuficientes para este plano.');
+        err.statusCode = 402;
+        err.balanceCents = user.creditCents || 0;
+        throw err;
+      }
+
+      // Fixa o plano no evento e debita o saldo.
+      event.planId = plan.id;
+      event.maxGuests = plan.maxGuests;
+      event.maxPhotos = plan.capacity != null ? plan.capacity : 0;
+      user.creditCents = (user.creditCents || 0) - price;
+      await user.save({ transaction: t });
+
+      // Registra o pagamento via credito (nao conta como receita de caixa).
+      const payment = await Plan.create({
+        eventId: event.id,
+        planId: plan.id,
+        amountCents: price,
+        provider: 'credit',
+        billingType: 'CREDITO',
+        status: 'paid',
+        paidAt: new Date(),
+      }, { transaction: t });
+
+      event.isPaid = true;
+      event.pricePaidCents = price;
+      if (event.status === EVENT_STATUS.DRAFT) event.status = EVENT_STATUS.ACTIVE;
+      await event.save({ transaction: t });
+
+      return { user, payment };
+    });
+
+    return res.json({
+      ok: true,
+      paidWithCredit: true,
+      event: { id: event.id, status: event.status, isPaid: event.isPaid },
+      creditCents: result.user.creditCents,
+      user: result.user.toJSON(),
+    });
+  } catch (err) {
+    if (err.statusCode === 402) {
+      return res.status(402).json({ error: err.message, creditCents: err.balanceCents });
+    }
+    return next(err);
+  }
+}
+
 async function activatePaidEvent(event, payment, billingType) {
   payment.status = 'paid';
   payment.paidAt = new Date();
@@ -368,4 +458,4 @@ async function activatePaidEvent(event, payment, billingType) {
   } catch (e) { /* ignora */ }
 }
 
-module.exports = { checkout, pixCheckout, cardCheckout, confirmMock, paymentStatus, webhook, activatePaidEvent };
+module.exports = { checkout, pixCheckout, cardCheckout, confirmMock, paymentStatus, webhook, activatePaidEvent, payWithCredit };

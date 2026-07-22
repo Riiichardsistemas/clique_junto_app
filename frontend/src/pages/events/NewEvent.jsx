@@ -137,7 +137,7 @@ export default function NewEvent() {
   }
 
   return (
-    <div className="app-screen pb-24 text-cream sm:pb-0">
+    <div className="app-screen flex flex-col text-cream">
       <header className="app-topbar glass sticky top-0 z-20">
         <div className="mx-auto flex min-h-[56px] max-w-2xl items-center justify-between px-4 sm:px-6">
           <button
@@ -153,7 +153,9 @@ export default function NewEvent() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-10">
+      {/* Coluna flex sem padding-bottom no mobile: o conteúdo (flex-1) empurra a
+          barra sticky de navegação para o rodapé mesmo em passos curtos */}
+      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-6 sm:px-6 sm:py-10">
         {/* Progresso — steps segmentados */}
         <div className="mb-8 sm:mb-12">
           <p className="mb-3 font-mono text-[10px] uppercase tracking-wider text-cream-dim/60">
@@ -175,6 +177,7 @@ export default function NewEvent() {
           <p className="mt-2 font-mono text-[10px] uppercase tracking-wider text-cream/85 sm:hidden">{STEPS[step]}</p>
         </div>
 
+        <div className="flex-1">
         <AnimatePresence mode="wait">
           {/* Passo 1 — Informações */}
           {step === 0 && (
@@ -484,6 +487,7 @@ export default function NewEvent() {
             </motion.div>
           )}
         </AnimatePresence>
+        </div>
 
         {/* Navegação */}
         <div className="mobile-action-bar mt-10 flex items-center justify-between gap-2">

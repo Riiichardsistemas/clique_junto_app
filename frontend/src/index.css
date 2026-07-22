@@ -391,13 +391,16 @@
     animation-name: mobile-sheet-in;
   }
 
+  /* Sticky (e não fixed): no iOS Safari, elementos fixed "descolam" do rodapé
+     quando a barra de endereço recolhe, deixando conteúdo vazar por baixo.
+     Sticky acompanha o viewport dinâmico e entra no fluxo no fim da página. */
   .mobile-action-bar {
-    position: fixed;
-    right: 0;
+    position: sticky;
     bottom: 0;
-    left: 0;
     z-index: 20;
-    margin: 0;
+    margin-top: 2.5rem;
+    margin-right: -1rem; /* sangra sobre o px-4 do <main> para ocupar a largura toda */
+    margin-left: -1rem;
     padding: .75rem 1rem max(.75rem, env(safe-area-inset-bottom));
     border-top: 1px solid var(--border);
     background: rgba(9,9,10,.92);

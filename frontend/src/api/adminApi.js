@@ -5,6 +5,7 @@ export const adminApi = {
   users: (params = {}) => api.get('/admin/users', { params }).then((r) => r.data),
   user: (id) => api.get(`/admin/users/${id}`).then((r) => r.data),
   updateUser: (id, data) => api.patch(`/admin/users/${id}`, data).then((r) => r.data),
+  grantCredit: (id, data) => api.post(`/admin/users/${id}/credits`, data).then((r) => r.data),
   events: (params = {}) => api.get('/admin/events', { params }).then((r) => r.data),
   event: (id) => api.get(`/admin/events/${id}`).then((r) => r.data),
   closeEvent: (id) => api.post(`/admin/events/${id}/close`).then((r) => r.data),

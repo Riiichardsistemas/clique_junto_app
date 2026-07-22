@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   CalendarDays, ChevronRight, Crown, Image, Loader2, Mail, Search,
-  ShieldCheck, ShieldOff, UserRound, Users, Wallet,
+  ShieldCheck, ShieldOff, UserRound, Users, Wallet, Coins, Gift,
 } from 'lucide-react';
+import { formatBRL } from '../../utils/plans';
 import AdminLayout from '../../components/admin/AdminLayout';
 import AdminDrawer from '../../components/admin/AdminDrawer';
 import AdminPagination from '../../components/admin/AdminPagination';
@@ -29,6 +30,8 @@ export default function AdminUsers() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [confirmation, setConfirmation] = useState(null);
   const [updating, setUpdating] = useState(false);
+  const [creditInput, setCreditInput] = useState('');
+  const [grantingCredit, setGrantingCredit] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 320);
@@ -85,6 +88,29 @@ export default function AdminUsers() {
       toast.error(error?.response?.data?.error || 'Não foi possível atualizar a conta.');
     } finally {
       setUpdating(false);
+    }
+  }
+
+  async function submitCredit(mode) {
+    if (!selectedUser) return;
+    const reais = Number(String(creditInput).replace(/\./g, '').replace(',', '.'));
+    if (!Number.isFinite(reais) || reais <= 0) {
+      toast.error('Informe um valor válido em reais.');
+      return;
+    }
+    const magnitude = Math.round(reais * 100);
+    const amountCents = mode === 'debit' ? -magnitude : magnitude;
+    setGrantingCredit(true);
+    try {
+      await adminApi.grantCredit(selectedUser.id, { amountCents, mode: 'add' });
+      toast.success(mode === 'debit' ? 'Créditos removidos.' : 'Créditos concedidos.');
+      setCreditInput('');
+      loadDetail(selectedUser.id);
+      load();
+    } catch (error) {
+      toast.error(error?.response?.data?.error || 'Não foi possível atualizar os créditos.');
+    } finally {
+      setGrantingCredit(false);
     }
   }
 
@@ -165,7 +191,12 @@ export default function AdminUsers() {
                   </span>
                 </span>
                 <span className="hidden text-sm text-cream-dim md:block">{account.eventCount} eventos</span>
-                <span className="hidden text-sm font-semibold text-cream md:block">{account.spent}</span>
+                <span className="hidden md:block">
+                  <span className="block text-sm font-semibold text-cream">{account.spent}</span>
+                  {account.creditCents > 0 && (
+                    <span className="mt-0.5 flex items-center gap-1 text-[11px] text-gold"><Coins size={11} /> {account.credit}</span>
+                  )}
+                </span>
                 <span className="hidden md:block">
                   {account.isActive
                     ? <span className={account.role === 'admin' ? 'badge-revealed' : 'badge-active'}>{account.role === 'admin' ? 'Super admin' : 'Ativo'}</span>
@@ -239,6 +270,52 @@ export default function AdminUsers() {
                   ))}
                 </div>
               ) : <p className="rounded-2xl border border-dashed border-line p-6 text-center text-sm text-cream-dim">Esta conta ainda não criou eventos.</p>}
+            </div>
+
+            <div className="border-t border-line pt-6">
+              <p className="mb-3 flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.15em] text-cream-dim/70">
+                <Coins size={13} className="text-gold" /> Créditos
+              </p>
+              <div className="rounded-2xl border border-line bg-white/[0.018] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-cream-dim">Saldo atual</span>
+                  <span className="font-serif text-2xl font-semibold text-gold">
+                    {detail.summary?.credit ?? formatBRL(selectedUser.creditCents || 0)}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-cream-dim/80">
+                  Créditos permitem que o organizador ative um evento pago sem pagar, direto no checkout.
+                </p>
+                <div className="mt-3 flex items-stretch gap-2">
+                  <div className="relative flex-1">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-cream-dim">R$</span>
+                    <input
+                      className="input-field pl-9"
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      aria-label="Valor em reais"
+                      value={creditInput}
+                      onChange={(event) => setCreditInput(event.target.value.replace(/[^\d.,]/g, ''))}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-primary btn-sm shrink-0"
+                    disabled={grantingCredit}
+                    onClick={() => submitCredit('add')}
+                  >
+                    {grantingCredit ? <Loader2 size={15} className="animate-spin" /> : <><Gift size={15} /> Conceder</>}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className="btn-danger-ghost btn-sm mt-2 w-full"
+                  disabled={grantingCredit || !(selectedUser.creditCents > 0)}
+                  onClick={() => submitCredit('debit')}
+                >
+                  Remover do saldo
+                </button>
+              </div>
             </div>
 
             <div className="border-t border-line pt-6">

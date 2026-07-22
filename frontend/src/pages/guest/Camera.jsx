@@ -59,7 +59,7 @@ function PreviewScreen({ previewUrl, onRetake, onUpload, uploading, filter, isVi
         </div>
         <p className="label-mono absolute bottom-6 left-1/2 -translate-x-1/2 text-cream/60">{filter?.label}</p>
       </div>
-      <div className="flex gap-3 bg-ink-deep px-6 py-6">
+      <div className="flex gap-3 bg-ink-deep px-6 pt-6" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
         <button onClick={onRetake} disabled={uploading} className="btn-ghost flex-1 rounded-2xl py-4">
           Descartar
         </button>

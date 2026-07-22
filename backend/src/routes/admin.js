@@ -12,6 +12,7 @@ router.get('/overview', ctrl.overview);
 router.get('/users', ctrl.listUsers);
 router.get('/users/:id', ctrl.getUser);
 router.patch('/users/:id', ctrl.updateUser);
+router.post('/users/:id/credits', ctrl.grantCredit);
 router.get('/events', ctrl.listEvents);
 router.get('/events/:id', ctrl.getEvent);
 router.post('/events/:id/close', ctrl.closeEvent);

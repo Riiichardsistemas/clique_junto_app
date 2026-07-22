@@ -9,7 +9,7 @@ import LogoMark from '../components/ui/LogoMark.jsx';
 /*
  * Tela de login em dois painéis, fiel ao mockup:
  * - Painel esquerdo: foto do evento desfocada + marca + tagline em serif.
- * - Painel direito: formulário com ícones, botão dourado e login social.
+ * - Painel direito: formulário com ícones e botão dourado.
  * - Polaroids decorativos flutuando ao redor do cartão.
  *
  * Imagens (opcionais — há fallback em gradiente se não existirem):
@@ -32,39 +32,6 @@ function Polaroid({ src, className = '', rotate = 0, size = 'h-[72px] w-[72px]',
     </div>
   );
 }
-
-function SocialButton({ label, onClick, children }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-line bg-white/[0.045] text-gold-light transition-all duration-250 hover:border-gold/40 hover:bg-gold/10 active:scale-95"
-    >
-      {children}
-    </button>
-  );
-}
-
-/* Ícones de marca (lucide não inclui logos) */
-const AppleIcon = () => (
-  <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="currentColor" aria-hidden="true">
-    <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.53 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-  </svg>
-);
-
-const PlayStoreIcon = () => (
-  <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="currentColor" aria-hidden="true">
-    <path d="M3.61 1.81a1.5 1.5 0 0 0-.61 1.2v17.98a1.5 1.5 0 0 0 .61 1.2l.09.06L13.79 12.2v-.4L3.7 1.75l-.09.06zm11.5 11.71 2.6 2.6 3.44-1.95c.98-.56.98-1.47 0-2.03l-3.45-1.96-2.59 2.6-.34.37.34.37zM4.9 22.13l9.6-9.56 2.28 2.28-9.11 5.17c-.9.51-1.9.54-2.62.16l-.15-.05zm0-20.26.15-.05c.72-.38 1.72-.35 2.62.16l9.11 5.17-2.28 2.28L4.9 1.87z"/>
-  </svg>
-);
-
-const GoogleIcon = () => (
-  <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="currentColor" aria-hidden="true">
-    <path d="M21.35 11.1H12v3.7h5.36c-.5 2.45-2.57 3.86-5.36 3.86a5.9 5.9 0 0 1 0-11.8c1.43 0 2.72.51 3.74 1.35l2.78-2.78A9.86 9.86 0 0 0 12 2.9a9.9 9.9 0 1 0 0 19.8c4.95 0 9.45-3.6 9.45-9.9 0-.58-.03-1.14-.1-1.7z"/>
-  </svg>
-);
 
 export default function Login() {
   const { login } = useAuth();
@@ -94,8 +61,6 @@ export default function Login() {
       setLoading(false);
     }
   };
-
-  const socialSoon = () => toast('Login social em breve!', { icon: '✨' });
 
   return (
     <div
@@ -254,21 +219,7 @@ export default function Login() {
                 </button>
               </form>
 
-              {/* Divisor */}
-              <div className="mt-6 flex items-center gap-4">
-                <span className="h-px flex-1 bg-white/12" />
-                <span className="text-[13px] font-medium text-cream/65">Ou entre com</span>
-                <span className="h-px flex-1 bg-white/12" />
-              </div>
-
-              {/* Social */}
-              <div className="mt-5 flex items-center justify-center gap-4">
-                <SocialButton label="Entrar com Apple" onClick={socialSoon}><AppleIcon /></SocialButton>
-                <SocialButton label="Entrar com Google Play" onClick={socialSoon}><PlayStoreIcon /></SocialButton>
-                <SocialButton label="Entrar com Google" onClick={socialSoon}><GoogleIcon /></SocialButton>
-              </div>
-
-              <p className="mt-4 text-center text-sm">
+              <p className="mt-6 text-center text-sm">
                 <Link to="/forgot-password" className="inline-flex min-h-10 items-center font-medium text-cream/75 transition hover:text-cream">
                   Esqueci minha senha
                 </Link>

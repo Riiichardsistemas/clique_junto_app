@@ -68,6 +68,19 @@ module.exports = (sequelize) => {
         type: DataTypes.DATE,
         allowNull: true,
       },
+      // Incrementado ao trocar/resetar a senha para invalidar JWTs ja emitidos.
+      tokenVersion: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+      },
+      // Saldo de creditos (em centavos de BRL) concedido pelo super-admin.
+      // Pode ser usado no checkout para ativar um evento pago sem pagar.
+      creditCents: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+      },
     },
     {
       tableName: 'users',

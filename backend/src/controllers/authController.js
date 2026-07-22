@@ -136,6 +136,7 @@ async function resetPassword(req, res, next) {
     user.passwordHash = await User.hashPassword(password);
     user.resetPasswordToken = null;
     user.resetPasswordExpires = null;
+    user.tokenVersion = (user.tokenVersion || 0) + 1; // invalida tokens antigos
     await user.save();
 
     res.json({ ok: true });
@@ -164,6 +165,7 @@ async function updateMe(req, res, next) {
       user.email = normalized;
     }
 
+    let passwordChanged = false;
     if (password) {
       if (String(password).length < 6) {
         return res.status(400).json({ error: 'A nova senha deve ter pelo menos 6 caracteres.' });
@@ -174,10 +176,16 @@ async function updateMe(req, res, next) {
         if (!ok) return res.status(401).json({ error: 'Senha atual incorreta.' });
       }
       user.passwordHash = await User.hashPassword(password);
+      user.tokenVersion = (user.tokenVersion || 0) + 1; // invalida outras sessoes
+      passwordChanged = true;
     }
 
     await user.save();
-    res.json({ user: user.toJSON() });
+    // Ao trocar a senha, emite um token novo para manter ESTA sessao valida
+    // (as demais sessoes/tokens antigos passam a ser rejeitados).
+    const response = { user: user.toJSON() };
+    if (passwordChanged) response.token = generateAuthToken(user);
+    res.json(response);
   } catch (err) {
     next(err);
   }

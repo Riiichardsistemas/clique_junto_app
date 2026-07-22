@@ -3,22 +3,28 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   CheckCircle2, QrCode, CreditCard, Loader2, ArrowLeft, Copy, ShieldCheck, ChevronLeft,
+  Coins, MessageCircle,
 } from 'lucide-react';
 import { paymentApi } from '../../api/paymentApi';
 import { eventApi } from '../../api/eventApi';
-import { getPlan, formatBRL } from '../../utils/plans';
+import { getPlan, formatBRL, isCustomPlan } from '../../utils/plans';
+import { useAuth } from '../../contexts/AuthContext';
 import PageLoader from '../../components/ui/PageLoader';
+
+const CONTACT_EMAIL = 'contato@papelariabaldasso.com.br';
 
 const onlyDigits = (v) => String(v || '').replace(/\D/g, '');
 
 export default function Checkout() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user, setUser } = useAuth();
 
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [method, setMethod] = useState(null); // null | 'pix' | 'card'
   const [paid, setPaid] = useState(false);
+  const [redeeming, setRedeeming] = useState(false);
 
   useEffect(() => {
     eventApi.getOne(id)
@@ -31,11 +37,30 @@ export default function Checkout() {
   }, [id, navigate]);
 
   const plan = event ? getPlan(event.planId) : null;
+  const custom = isCustomPlan(plan);
+  const price = plan?.priceCents || 0;
+  const creditCents = user?.creditCents || 0;
+  const canUseCredit = !custom && price > 0 && creditCents >= price;
 
   function onPaid() {
     setPaid(true);
     toast.success('Pagamento confirmado! Evento ativado.');
     setTimeout(() => navigate(`/events/${id}`), 1400);
+  }
+
+  async function redeemCredit() {
+    setRedeeming(true);
+    try {
+      const d = await paymentApi.credit(id, event.planId);
+      if (d.user) setUser(d.user);
+      setPaid(true);
+      toast.success('Evento ativado com seus créditos!');
+      setTimeout(() => navigate(`/events/${id}`), 1400);
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Não foi possível usar os créditos.');
+    } finally {
+      setRedeeming(false);
+    }
   }
 
   if (loading) return <PageLoader label="Carregando pagamento" />;
@@ -66,8 +91,46 @@ export default function Checkout() {
                 <p className="label-mono truncate">{event?.name}</p>
                 <p className="mt-1 text-lg text-cream">{plan?.label || event?.planId}</p>
               </div>
-              <p className="shrink-0 text-2xl font-semibold text-cream">{formatBRL(plan?.priceCents || 0)}</p>
+              <p className="shrink-0 text-2xl font-semibold text-cream">{formatBRL(plan ? plan.priceCents : 0)}</p>
             </div>
+
+            {custom ? (
+              <div className="card animate-fadein p-6 text-center">
+                <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-gold/25 bg-gold/10">
+                  <MessageCircle className="h-6 w-6 text-gold" />
+                </span>
+                <h3 className="mt-3 text-lg font-semibold text-cream">Plano sob consulta</h3>
+                <p className="mx-auto mt-1.5 max-w-sm text-sm text-cream-dim">
+                  Para eventos com mais de 200 participantes, montamos um plano com limites sob medida. Fale com a gente para liberar o seu.
+                </p>
+                <a
+                  href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Plano personalizado — ' + (event?.name || ''))}`}
+                  className="btn-primary mt-4 inline-flex w-full items-center justify-center"
+                >
+                  Falar com a equipe
+                </a>
+                <p className="mt-3 text-xs text-cream-dim/70">{CONTACT_EMAIL}</p>
+              </div>
+            ) : (
+            <>
+            {/* Pagar com créditos (quando o saldo cobre o plano) */}
+            {canUseCredit && !method && (
+              <div className="card mb-3 animate-fadein p-5">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-gold/25 bg-gold/10">
+                    <Coins className="h-5 w-5 text-gold" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-cream">Usar meus créditos</p>
+                    <p className="text-xs text-cream-dim">Saldo disponível: {formatBRL(creditCents)}</p>
+                  </div>
+                </div>
+                <button type="button" onClick={redeemCredit} disabled={redeeming} className="btn-primary mt-4 w-full">
+                  {redeeming ? <Loader2 className="h-4 w-4 animate-spin" /> : `Ativar com créditos (${formatBRL(price)})`}
+                </button>
+                <p className="mt-2 text-center text-[11px] text-cream-dim/70">O valor é descontado do seu saldo e o evento é ativado na hora.</p>
+              </div>
+            )}
 
             {!method && (
               <div className="animate-fadein space-y-3">
@@ -104,6 +167,8 @@ export default function Checkout() {
             {method === 'card' && (
               <CardPanel eventId={id} planId={event.planId}
                 onBack={() => setMethod(null)} onPaid={onPaid} />
+            )}
+            </>
             )}
           </>
         )}

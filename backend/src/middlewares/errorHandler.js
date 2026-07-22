@@ -16,8 +16,11 @@ function errorHandler(err, req, res, next) {
   // Erro com status definido manualmente
   const status = err.status || err.statusCode || 500;
 
+  // Erros 5xx: loga o detalhe no servidor, mas NUNCA vaza a mensagem interna
+  // (stack, SQL, infra) ao cliente. Erros 4xx sao mensagens de negocio seguras.
   if (status >= 500) {
     console.error('[ERRO]', err);
+    return res.status(status).json({ error: 'Erro interno do servidor.' });
   }
 
   res.status(status).json({

@@ -37,6 +37,7 @@ async function serializeEvent(event) {
     status: event.status,
     planId: event.planId,
     maxGuests: event.maxGuests,
+    maxPhotos: event.maxPhotos,
     isPaid: event.isPaid,
     pricePaidCents: event.pricePaidCents,
     createdAt: event.createdAt,
@@ -85,7 +86,10 @@ async function overview(req, res, next) {
       return acc;
     }, {});
 
-    const paid = await Plan.findAll({ where: { status: 'paid' }, raw: true });
+    const allPaid = await Plan.findAll({ where: { status: 'paid' }, raw: true });
+    // Redencoes via credito nao sao receita de caixa — excluidas das metricas financeiras.
+    const paid = allPaid.filter((payment) => payment.provider !== 'credit');
+    const creditRedemptions = allPaid.filter((payment) => payment.provider === 'credit');
     const revenueCents = paid.reduce((sum, payment) => sum + (payment.amountCents || 0), 0);
     const paidThisMonth = paid.filter((payment) => new Date(payment.paidAt || payment.updatedAt) >= monthStart);
     const revenueMonthCents = paidThisMonth.reduce((sum, payment) => sum + (payment.amountCents || 0), 0);
@@ -117,7 +121,7 @@ async function overview(req, res, next) {
 
     const [recent, recentAudit] = await Promise.all([
       Plan.findAll({
-        where: { status: 'paid' },
+        where: { status: 'paid', provider: { [Op.ne]: 'credit' } },
         order: [['paidAt', 'DESC'], ['updatedAt', 'DESC']],
         limit: 6,
         include: [{
@@ -149,6 +153,8 @@ async function overview(req, res, next) {
         pendingPayments,
         failedPayments,
         salesCount: paid.length,
+        creditRedemptions: creditRedemptions.length,
+        creditRedeemedCents: creditRedemptions.reduce((sum, payment) => sum + (payment.amountCents || 0), 0),
         revenueCents,
         revenue: formatBRL(revenueCents),
         revenueMonthCents,
@@ -217,7 +223,7 @@ async function listUsers(req, res, next) {
       const [eventCount, paidPlans] = await Promise.all([
         Event.count({ where: { userId: user.id } }),
         Plan.findAll({
-          where: { status: 'paid' },
+          where: { status: 'paid', provider: { [Op.ne]: 'credit' } },
           include: [{ model: Event, as: 'event', attributes: [], where: { userId: user.id } }],
           raw: true,
         }),
@@ -233,6 +239,8 @@ async function listUsers(req, res, next) {
         eventCount,
         spentCents,
         spent: formatBRL(spentCents),
+        creditCents: user.creditCents || 0,
+        credit: formatBRL(user.creditCents || 0),
       };
     }));
 
@@ -251,7 +259,7 @@ async function getUser(req, res, next) {
     const rawEvents = await Event.findAll({ where: { userId: user.id }, order: [['createdAt', 'DESC']] });
     const events = await Promise.all(rawEvents.map((event) => serializeEvent(event)));
     const payments = await Plan.findAll({
-      where: { status: 'paid' },
+      where: { status: 'paid', provider: { [Op.ne]: 'credit' } },
       include: [{ model: Event, as: 'event', attributes: ['id', 'name'], where: { userId: user.id } }],
       order: [['paidAt', 'DESC'], ['createdAt', 'DESC']],
     });
@@ -267,6 +275,8 @@ async function getUser(req, res, next) {
         guestCount: events.reduce((sum, event) => sum + event.guestCount, 0),
         spentCents,
         spent: formatBRL(spentCents),
+        creditCents: user.creditCents || 0,
+        credit: formatBRL(user.creditCents || 0),
       },
     });
   } catch (error) {
@@ -322,6 +332,57 @@ async function updateUser(req, res, next) {
     }
 
     return res.json({ user: user.toJSON() });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+// POST /api/admin/users/:id/credits
+// Concede (ou ajusta) o saldo de creditos de um usuario.
+// Corpo: { amountCents, mode?: 'add' | 'set', reason? }
+//  - mode 'add' (padrao): soma amountCents ao saldo (pode ser negativo para debitar)
+//  - mode 'set': define o saldo exatamente como amountCents
+async function grantCredit(req, res, next) {
+  try {
+    const user = await User.findByPk(req.params.id);
+    if (!user) return res.status(404).json({ error: 'Usuario nao encontrado.' });
+
+    const amountCents = Math.round(Number(req.body.amountCents));
+    const mode = req.body.mode === 'set' ? 'set' : 'add';
+    const reason = typeof req.body.reason === 'string' ? req.body.reason.slice(0, 200) : null;
+
+    if (!Number.isFinite(amountCents)) {
+      return res.status(400).json({ error: 'Valor de credito invalido.' });
+    }
+
+    const previousCents = user.creditCents || 0;
+    const nextCents = mode === 'set' ? amountCents : previousCents + amountCents;
+    if (nextCents < 0) {
+      return res.status(400).json({ error: 'O saldo de creditos nao pode ficar negativo.' });
+    }
+
+    user.creditCents = nextCents;
+    await user.save();
+
+    await recordAdminAction(req, {
+      action: 'user.credit.granted',
+      targetType: 'user',
+      targetId: user.id,
+      targetLabel: `${user.name} (${user.email})`,
+      metadata: {
+        mode,
+        deltaCents: nextCents - previousCents,
+        previousCents,
+        balanceCents: nextCents,
+        reason,
+      },
+    });
+
+    return res.json({
+      user: user.toJSON(),
+      creditCents: nextCents,
+      credit: formatBRL(nextCents),
+    });
   } catch (error) {
     return next(error);
   }
@@ -647,6 +708,7 @@ module.exports = {
   listUsers,
   getUser,
   updateUser,
+  grantCredit,
   listEvents,
   getEvent,
   closeEvent,

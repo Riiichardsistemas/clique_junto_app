@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 
 const isProduction = process.env.NODE_ENV === 'production';
 const railwayPublicDomain = String(process.env.RAILWAY_PUBLIC_DOMAIN || '').trim();
@@ -60,6 +61,12 @@ function validateProductionConfig() {
     errors.add('GUEST_JWT_SECRET');
   }
 
+  // Se o gateway de pagamento real estiver ativo, o token do webhook e obrigatorio
+  // (senao qualquer um poderia liberar um evento pago via POST /api/payments/webhook).
+  if (process.env.ASAAS_API_KEY && String(process.env.ASAAS_WEBHOOK_TOKEN || '').length < 16) {
+    errors.add('ASAAS_WEBHOOK_TOKEN');
+  }
+
   if (errors.size) {
     throw new Error(
       `Variaveis obrigatorias ausentes, invalidas ou inseguras: ${[...errors].join(', ')}`
@@ -77,6 +84,28 @@ const { startRevealJob } = require('./jobs/revealJob');
 const storage = require('./config/storage');
 
 const app = express();
+
+// Remove o fingerprint do framework e aplica cabecalhos de seguranca.
+app.disable('x-powered-by');
+app.use(
+  helmet({
+    // Permite que o frontend (outro dominio) carregue imagens/videos servidos em /uploads.
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    // A API responde JSON/midia; uma CSP restritiva evita que respostas sejam
+    // interpretadas como HTML executavel.
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'none'"],
+        imgSrc: ["'self'", 'data:'],
+        mediaSrc: ["'self'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+  })
+);
+if (isProduction) {
+  app.use(helmet.hsts({ maxAge: 15552000, includeSubDomains: true }));
+}
 
 // Railway/Vercel ficam atras de proxy — necessario para rate-limit e IPs corretos
 app.set('trust proxy', 1);
@@ -108,9 +137,20 @@ app.use('/api/payments/webhook', express.raw({ type: '*/*', limit: '1mb' }));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Arquivos enviados (modo local de storage)
+// Arquivos enviados (modo local de storage).
+// nosniff + CSP sandbox impedem que um arquivo enviado seja interpretado como
+// HTML/JS executavel pelo navegador (defesa contra XSS armazenado via upload).
 if (!storage.useS3) {
-  app.use('/uploads', express.static(storage.uploadsDir));
+  app.use(
+    '/uploads',
+    express.static(storage.uploadsDir, {
+      setHeaders(res) {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      },
+    })
+  );
 }
 
 // Rate limit geral
@@ -156,6 +196,61 @@ process.once('SIGINT', () => shutdown('SIGINT').catch((error) => {
   process.exit(1);
 }));
 
+// Migracoes idempotentes executadas em todo boot (inclusive em producao, onde o
+// sync({ alter }) fica desligado). Adiciona colunas novas somente se ainda nao existirem.
+async function runStartupMigrations() {
+  const qi = db.sequelize.getQueryInterface();
+  const { DataTypes } = db.Sequelize;
+
+  const ensureColumn = async (table, column, definition) => {
+    let description;
+    try {
+      description = await qi.describeTable(table);
+    } catch (_error) {
+      return; // tabela ainda nao existe (sera criada pelo sync)
+    }
+    if (!description[column]) {
+      await qi.addColumn(table, column, definition);
+      console.log(`[DB] Migracao: coluna ${table}.${column} adicionada.`);
+    }
+  };
+
+  // #5 — versao do token para revogacao (invalida JWTs antigos ao trocar/reset de senha)
+  await ensureColumn('users', 'tokenVersion', {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+  });
+
+  // #6 — saldo de creditos do organizador (concedido pelo super-admin)
+  await ensureColumn('users', 'creditCents', {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+  });
+
+  // #7 — capacidade de memorias do album, conforme o plano (0 = ilimitado).
+  // Eventos ja existentes recebem 0 (sem novo limite); novos eventos recebem a
+  // capacidade do plano ao serem criados/pagos.
+  await ensureColumn('events', 'maxPhotos', {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+  });
+
+  // #8 — novo valor 'credit' no enum de provedor de pagamento (apenas Postgres).
+  // No SQLite o enum e um CHECK recriado pelo sync({ alter }) em desenvolvimento.
+  if (db.sequelize.getDialect() === 'postgres') {
+    try {
+      await db.sequelize.query(
+        "ALTER TYPE \"enum_plans_provider\" ADD VALUE IF NOT EXISTS 'credit'"
+      );
+    } catch (error) {
+      console.warn('[DB] Nao foi possivel garantir o valor de enum credit:', error.message);
+    }
+  }
+}
+
 async function start() {
   try {
     await db.sequelize.authenticate();
@@ -164,6 +259,8 @@ async function start() {
     const shouldAlterSchema = !isProduction && process.env.DATABASE_SYNC_ALTER !== 'false';
     await db.sequelize.sync({ alter: shouldAlterSchema });
     console.log('[DB] Models sincronizados.');
+
+    await runStartupMigrations();
 
     startRevealJob();
 

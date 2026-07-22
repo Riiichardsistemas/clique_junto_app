@@ -81,6 +81,7 @@ async function create(req, res, next) {
       isPrivate: !!isPrivate,
       planId: plan.id,
       maxGuests: plan.maxGuests,
+      maxPhotos: plan.capacity != null ? plan.capacity : 0,
       slideshowKey,
       themeColor: themeColor && /^#[0-9a-fA-F]{6}$/.test(themeColor) ? themeColor : null,
       welcomeMessage: welcomeMessage ? String(welcomeMessage).slice(0, 280) : null,

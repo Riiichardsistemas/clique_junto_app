@@ -14,7 +14,9 @@ module.exports = (sequelize) => {
       planId: { type: DataTypes.STRING, allowNull: false },
       amountCents: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
       provider: {
-        type: DataTypes.ENUM('mock', 'stripe', 'pagarme', 'asaas'),
+        // 'credit' = evento ativado com o saldo de creditos do organizador
+        // (concedido pelo super-admin), sem entrada de caixa real.
+        type: DataTypes.ENUM('mock', 'stripe', 'pagarme', 'asaas', 'credit'),
         allowNull: false,
         defaultValue: 'mock',
       },
