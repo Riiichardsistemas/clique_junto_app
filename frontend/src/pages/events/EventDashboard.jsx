@@ -110,6 +110,7 @@ export default function EventDashboard() {
   const [recapGenerating, setRecapGenerating] = useState(false);
   const [confirmation, setConfirmation] = useState(null);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
+  const [deskMenuOpen, setDeskMenuOpen] = useState(false); // menu "…" do desktop
   const confirmationResolve = useRef(null);
 
   function askConfirmation(options) {
@@ -365,7 +366,7 @@ export default function EventDashboard() {
             <MoreHorizontal size={19} />
           </button>
         </div>
-        <div className="mx-auto hidden max-w-3xl flex-wrap items-center gap-x-1.5 gap-y-1 px-4 py-2.5 sm:flex sm:px-6">
+        <div className="mx-auto hidden max-w-3xl flex-wrap items-center gap-x-1.5 gap-y-1 px-4 py-2.5 sm:flex sm:px-6 lg:max-w-5xl">
           <Link to="/dashboard" className="inline-flex min-h-11 items-center gap-1 rounded-full px-2 text-sm text-cream-dim transition hover:text-cream">
             <ChevronLeft size={16} />
             Eventos
@@ -395,11 +396,31 @@ export default function EventDashboard() {
               <span className="hidden sm:inline">Telão</span>
             </a>
           )}
-          <button type="button" onClick={handleDelete} disabled={acting}
-            className="icon-button !h-10 !w-10 text-red-400/60 hover:text-red-400 disabled:opacity-40"
-            title="Excluir" aria-label="Excluir evento">
-            <Trash2 size={15} />
-          </button>
+          {/* Menu "…" — ações secundárias/destrutivas (mockup) */}
+          <div className="relative">
+            <button type="button" onClick={() => setDeskMenuOpen((v) => !v)} aria-expanded={deskMenuOpen}
+              className="btn-ghost flex h-11 w-11 items-center justify-center !rounded-full !p-0" aria-label="Mais ações" title="Mais ações">
+              <MoreHorizontal size={16} />
+            </button>
+            {deskMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setDeskMenuOpen(false)} />
+                <div className="absolute right-0 top-full z-40 mt-2 w-52 overflow-hidden rounded-2xl border border-line bg-[#141416] py-1.5 shadow-2xl"
+                  onClick={() => setDeskMenuOpen(false)}>
+                  {(event.status === 'active' || (event.status === 'revealed' && event.isAcceptingPhotos)) && (
+                    <button type="button" disabled={acting} onClick={handleClose}
+                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[13px] font-medium text-cream transition hover:bg-white/[0.05]">
+                      <Lock size={15} className="text-warning" /> Encerrar evento
+                    </button>
+                  )}
+                  <button type="button" disabled={acting} onClick={handleDelete}
+                    className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-[13px] font-medium text-danger transition hover:bg-danger/[0.08]">
+                    <Trash2 size={15} /> Excluir evento
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
           {event.status === 'draft' && event.isPaid && (
             <button disabled={acting} onClick={handlePublish} className="btn-primary btn-sm">
               <Rocket size={14} />
@@ -410,12 +431,6 @@ export default function EventDashboard() {
             <button disabled={acting} onClick={handlePay} className="btn-primary btn-sm">
               <CreditCard size={14} />
               Pagar e ativar
-            </button>
-          )}
-          {(event.status === 'active' || (event.status === 'revealed' && event.isAcceptingPhotos)) && (
-            <button disabled={acting} onClick={handleClose} className="btn-ghost btn-sm" title="Encerrar">
-              <Lock size={14} />
-              <span className="hidden sm:inline">Encerrar</span>
             </button>
           )}
           {(event.status === 'active' || event.status === 'closed') && (
@@ -462,17 +477,33 @@ export default function EventDashboard() {
         </div>
       </MobileActionSheet>
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5 sm:px-6 sm:py-6">
-        {/* Título — no mobile ele vive no cabeçalho; aqui só no desktop */}
-        <div className="mb-5 hidden flex-wrap items-center gap-x-3 gap-y-1.5 sm:flex">
-          <h1 className="font-serif text-3xl font-semibold tracking-tight">{event.name}</h1>
-          <StatusBadge status={event.status} />
-          <span className="label-mono !text-[10px] text-cream/35">{TYPE_LABEL[event.type] || 'Evento'}</span>
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5 sm:px-6 sm:py-6 lg:max-w-5xl">
+        {/* Cabeçalho desktop — tile do tipo + nome + badge + metadados (mockup) */}
+        <div className="mb-6 hidden items-center gap-4 sm:flex">
+          {(() => { const { Icon, cls } = TYPE_META[event.type] || TYPE_META.outro; return (
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-line bg-surface">
+              <Icon size={24} className={cls} fill="currentColor" strokeWidth={1.5} />
+            </span>
+          ); })()}
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="font-serif text-3xl font-semibold tracking-tight">{event.name}</h1>
+              <StatusBadge status={event.status} />
+            </div>
+            <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[13px] text-cream/40">
+              <span>{TYPE_LABEL[event.type] || 'Evento'}</span>
+              <span>· Criado em {createdAt}</span>
+              {event.revealAt && !event.isRevealed && (
+                <span>· Revelação em {new Date(event.revealAt).toLocaleDateString('pt-BR')}, {new Date(event.revealAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+              )}
+              {event.isRevealed && <span>· Revelado</span>}
+            </p>
+          </div>
         </div>
 
-        {/* Countdowns */}
+        {/* Countdowns — cartões dourados só no mobile (no desktop viram metadados) */}
         {(event.status === 'active' || event.status === 'closed' || event.isAcceptingPhotos) && (
-          <div className="mb-3 grid gap-2 sm:grid-cols-2">
+          <div className="mb-3 grid gap-2 sm:hidden">
             {event.endsAt && event.isAcceptingPhotos && (
               <CountdownPanel label="Encerramento em" target={event.endsAt} />
             )}
@@ -482,64 +513,78 @@ export default function EventDashboard() {
           </div>
         )}
 
-        {/* Stats — três cartões separados, números grandes (mockup) */}
-        <div className="mb-3 grid grid-cols-3 gap-2">
+        {/* Stats — cartões separados no mobile; um cartão largo com divisores no desktop */}
+        <div className="mb-3 grid grid-cols-3 gap-2 sm:mb-5 sm:gap-0 sm:overflow-hidden sm:rounded-2xl sm:border sm:border-line sm:bg-surface sm:shadow-card sm:divide-x sm:divide-line/50">
           <StatCell label="Convidados" value={guestCount} />
           <StatCell label="Fotos" value={photoCount} />
           <StatCell label="Por pessoa" value={perPerson} />
         </div>
 
-        {/* Tabs — pills roláveis com badge de contagem (mockup) */}
-        <div className="scrollbar-hide mb-4 flex gap-2 overflow-x-auto pb-1 sm:mb-5" role="tablist" aria-label="Seções do evento">
-          {[['overview', 'Visão geral', null], ['photos', 'Fotos', photoCount], ['guests', 'Convidados', guestCount], ['qr', 'QR Code', null]].map(([key, label, count]) => (
-            <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)}
-              className={`flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-4 text-[13px] font-semibold transition-all duration-200 ${
-                tab === key
-                  ? 'border-gold bg-gold text-[#1c160c] shadow-[0_4px_16px_-4px_rgba(196,169,108,0.5)]'
-                  : 'border-line bg-surface text-cream-dim hover:border-gold/30 hover:text-cream'}`}>
-              {label}
-              {count != null && count > 0 && (
-                <span className={`rounded-full px-1.5 py-px text-[10px] font-bold ${
-                  tab === key ? 'bg-black/15' : 'bg-white/[0.08] text-cream/60'}`}>
-                  {count}
-                </span>
-              )}
-            </button>
-          ))}
+        {/* Tabs — pills roláveis no mobile; grupo em cápsula no desktop (mockup) */}
+        <div className="mb-4 sm:mb-5">
+          <div className="scrollbar-hide flex gap-2 overflow-x-auto pb-1 sm:inline-flex sm:gap-1 sm:overflow-visible sm:rounded-full sm:border sm:border-line sm:bg-surface sm:p-1 sm:pb-1" role="tablist" aria-label="Seções do evento">
+            {[['overview', 'Visão geral', null], ['photos', 'Fotos', photoCount], ['guests', 'Convidados', guestCount], ['qr', 'QR Code', null]].map(([key, label, count]) => (
+              <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)}
+                className={`flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-4 text-[13px] font-semibold transition-all duration-200 ${
+                  tab === key
+                    ? 'border-gold bg-gold text-[#1c160c] shadow-[0_4px_16px_-4px_rgba(196,169,108,0.5)]'
+                    : 'border-line bg-surface text-cream-dim hover:text-cream sm:border-transparent sm:bg-transparent'}`}>
+                {label}
+                {count != null && count > 0 && (
+                  <span className={`rounded-full px-1.5 py-px text-[10px] font-bold ${
+                    tab === key ? 'bg-black/15' : 'bg-white/[0.08] text-cream/60'}`}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Visão geral */}
         {tab === 'overview' && (
-          <div className="animate-fadein space-y-3">
+          <div className="animate-fadein grid gap-3 lg:grid-cols-3 lg:items-start">
+            <div className="space-y-3 lg:col-span-2">
             {/* Link do evento — campo + Copiar dourado, QR Code e Compartilhar (mockup) */}
-            <div className="card p-4">
-              <p className="label-mono mb-3 !text-[10px] text-cream/35">Link do evento</p>
-              <div className="flex items-stretch gap-2">
-                <code className="flex min-w-0 flex-1 items-center truncate rounded-xl border border-line/60 bg-black/40 px-3 py-2.5 font-mono text-[12px] text-cream/80">
-                  {(() => { const u = guestUrl.replace(/^https?:\/\//, ''); return u.length > 30 ? `…${u.slice(-28)}` : u; })()}
-                </code>
-                <button onClick={() => { navigator.clipboard.writeText(guestUrl); toast.success('Link copiado!'); }}
-                  className="flex shrink-0 items-center gap-1.5 rounded-xl bg-gold px-4 text-[13px] font-bold text-[#1c160c] transition hover:brightness-105 active:scale-[0.97]">
-                  <Copy size={14} />
-                  Copiar
-                </button>
+            <div className="card p-4 sm:p-5">
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <p className="label-mono !text-[10px] text-cream/35">Link do evento</p>
+                <p className="hidden text-[12px] text-cream/30 sm:block">Compartilhe para os convidados enviarem fotos</p>
               </div>
-              <div className="mt-2.5 flex gap-2">
-                <button onClick={() => setTab('qr')} className="btn-ghost h-11 min-h-11 flex-1 rounded-full text-[13px]">
-                  <QrCode size={15} />
-                  QR Code
-                </button>
-                <button onClick={handleShare} className="btn-ghost h-11 min-h-11 flex-1 rounded-full text-[13px]">
-                  <Share2 size={15} />
-                  Compartilhar
-                </button>
+              <div className="flex flex-col gap-2.5 sm:flex-row sm:items-stretch">
+                <div className="flex min-w-0 flex-1 items-stretch gap-2">
+                  <code className="flex min-w-0 flex-1 items-center truncate rounded-xl border border-line/60 bg-black/40 px-3 py-2.5 font-mono text-[12px] text-cream/80">
+                    {(() => { const u = guestUrl.replace(/^https?:\/\//, ''); return u.length > 34 ? `…${u.slice(-32)}` : u; })()}
+                  </code>
+                  <button onClick={() => { navigator.clipboard.writeText(guestUrl); toast.success('Link copiado!'); }}
+                    className="flex shrink-0 items-center gap-1.5 rounded-xl bg-gold px-4 text-[13px] font-bold text-[#1c160c] transition hover:brightness-105 active:scale-[0.97]">
+                    <Copy size={14} />
+                    Copiar
+                  </button>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button onClick={() => setTab('qr')} className="btn-ghost h-11 min-h-11 flex-1 rounded-full text-[13px] sm:flex-none sm:px-4">
+                    <QrCode size={15} />
+                    QR Code
+                  </button>
+                  <button onClick={handleShare} className="btn-ghost h-11 min-h-11 flex-1 rounded-full text-[13px] sm:flex-none sm:px-4">
+                    <Share2 size={15} />
+                    Compartilhar
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Convidados + Detalhes lado a lado */}
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="card p-4">
-                <p className="label-mono mb-3 !text-[10px] text-cream/35">Últimos convidados</p>
+              <div className="card p-4 sm:p-5">
+                <div className="mb-3 flex items-baseline justify-between gap-3">
+                  <p className="label-mono !text-[10px] text-cream/35">Últimos convidados</p>
+                  {guests.length > 0 && (
+                    <button type="button" onClick={() => setTab('guests')}
+                      className="text-[12px] font-semibold text-cream/60 underline-offset-4 transition hover:text-cream hover:underline">
+                      Ver todos
+                    </button>
+                  )}
+                </div>
                 {recentGuests.length === 0 ? (
                   <p className="text-[13px] text-cream/35">Ninguém entrou ainda.</p>
                 ) : (
@@ -562,58 +607,64 @@ export default function EventDashboard() {
                 )}
               </div>
 
-              <div className="card p-4">
-                <p className="label-mono mb-1 !text-[10px] text-cream/35">Detalhes</p>
-                <div className="divide-y divide-line/40">
-                  {[
-                    ['Tipo', TYPE_LABEL[event.type] || event.type],
-                    ['Fotos por convidado', event.photoLimitPerGuest === 0 ? 'Ilimitado' : (event.photoLimitPerGuest ?? 10)],
-                    ['Criado em', createdAt],
-                    ['Revelação', event.revealAt ? new Date(event.revealAt).toLocaleString('pt-BR') : 'Imediata'],
-                  ].map(([k, v]) => (
-                    <div key={k} className="flex items-center justify-between gap-3 py-2.5 text-[13px]">
-                      <span className="shrink-0 text-gold/55">{k}</span>
-                      <span className="truncate text-right font-semibold text-cream">{v}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
 
-            {/* Recap vídeo — só exibe após revelação */}
+            {/* Detalhes — coluna direita no desktop (mockup) */}
+            <div className="card p-4 sm:p-5">
+              <p className="label-mono mb-1 !text-[10px] text-cream/35">Detalhes</p>
+              <div className="divide-y divide-line/40">
+                {[
+                  ['Tipo', TYPE_LABEL[event.type] || event.type],
+                  ['Fotos por convidado', event.photoLimitPerGuest === 0 ? 'Ilimitado' : (event.photoLimitPerGuest ?? 10)],
+                  ['Criado em', createdAt],
+                  ['Revelação', event.revealAt ? new Date(event.revealAt).toLocaleString('pt-BR') : 'Imediata'],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex items-center justify-between gap-3 py-2.5 text-[13px]">
+                    <span className="shrink-0 text-gold/55">{k}</span>
+                    <span className="truncate text-right font-semibold text-cream">{v}</span>
+                  </div>
+                ))}
+              </div>
+              <button type="button" onClick={openEdit}
+                className="mt-3 inline-flex min-h-10 items-center text-[13px] font-semibold text-gold underline-offset-4 transition hover:underline">
+                Editar detalhes
+              </button>
+            </div>
+
+            {/* Recap vídeo — cartão horizontal (mockup); só após revelação */}
             {event.status === 'revealed' && (
-              <div className="card p-4">
-                <p className="label-mono mb-3 !text-[10px] text-cream/35">Vídeo recap</p>
+              <div className="card p-4 sm:p-5 lg:col-span-2">
                 {recapStatus === 'ready' && recapUrl ? (
                   <div className="space-y-3">
+                    <p className="label-mono !text-[10px] text-cream/35">Vídeo recap</p>
                     <video src={recapUrl} controls className="w-full rounded-xl" />
-                    <a href={recapUrl} download className="btn-primary block rounded-2xl py-2.5 text-center text-sm">
+                    <a href={recapUrl} download className="btn-primary block rounded-2xl py-2.5 text-center text-sm sm:inline-block sm:px-6">
                       Baixar recap
                     </a>
                   </div>
-                ) : recapStatus === 'processing' ? (
-                  <div className="flex items-center gap-3 text-sm text-cream/50">
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-cream/20 border-t-cream/60" />
-                    Gerando seu slideshow… isso pode levar alguns minutos.
-                  </div>
-                ) : recapStatus === 'failed' ? (
-                  <div className="space-y-3">
-                    <p className="text-sm text-red-300/70">Geração falhou. Verifique se o ffmpeg está instalado no servidor.</p>
-                    <button onClick={handleGenerateRecap} disabled={recapGenerating}
-                      className="btn-ghost rounded-2xl px-5 py-2 text-sm disabled:opacity-40">
-                      Tentar novamente
-                    </button>
-                  </div>
                 ) : (
-                  <div className="space-y-2">
-                    <p className="text-sm text-cream/40">
-                      Gere um slideshow com até 30 fotos do evento em formato MP4.
-                    </p>
-                    <button onClick={handleGenerateRecap} disabled={recapGenerating}
-                      className="btn-ghost rounded-2xl px-5 py-2 text-sm disabled:opacity-40">
-                      <Clapperboard size={14} />
-                      {recapGenerating ? 'Iniciando…' : 'Gerar recap'}
-                    </button>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-line bg-white/[0.04]">
+                      <Clapperboard size={20} className="text-gold" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[14px] font-bold text-cream">Vídeo recap</p>
+                      <p className="mt-0.5 text-[13px] text-cream/40">
+                        {recapStatus === 'processing'
+                          ? 'Gerando seu slideshow… isso pode levar alguns minutos.'
+                          : recapStatus === 'failed'
+                            ? 'Geração falhou. Verifique se o ffmpeg está instalado no servidor.'
+                            : 'Slideshow em MP4 com até 30 fotos do evento.'}
+                      </p>
+                    </div>
+                    {recapStatus === 'processing' ? (
+                      <span className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-cream/20 border-t-cream/60" />
+                    ) : (
+                      <button onClick={handleGenerateRecap} disabled={recapGenerating}
+                        className="btn-ghost h-11 min-h-11 shrink-0 rounded-full px-5 text-[13px] disabled:opacity-40">
+                        {recapGenerating ? 'Iniciando…' : recapStatus === 'failed' ? 'Tentar novamente' : 'Gerar recap'}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

@@ -46,13 +46,29 @@ async function asaasFetch(path, { method = 'GET', body } = {}) {
  * Retorna o id do customer.
  */
 async function ensureCustomer({ name, email, cpfCnpj }) {
+  const wantDigits = String(cpfCnpj || '').replace(/\D/g, '');
+
   // Tenta localizar por email
   const found = await asaasFetch(`/customers?email=${encodeURIComponent(email)}`);
-  if (found?.data?.length) return found.data[0].id;
+  if (found?.data?.length) {
+    const existing = found.data[0];
+    // Cliente pode ter sido criado antes SEM CPF/CNPJ (ou com outro). Atualiza
+    // via PUT para garantir que a cobranca nao falhe por falta do documento.
+    const currentDigits = String(existing.cpfCnpj || '').replace(/\D/g, '');
+    if (wantDigits && currentDigits !== wantDigits) {
+      try {
+        await asaasFetch(`/customers/${existing.id}`, {
+          method: 'PUT',
+          body: { cpfCnpj: wantDigits },
+        });
+      } catch (e) { /* segue com o cliente existente */ }
+    }
+    return existing.id;
+  }
 
   const created = await asaasFetch('/customers', {
     method: 'POST',
-    body: { name, email, cpfCnpj: cpfCnpj || undefined },
+    body: { name, email, cpfCnpj: wantDigits || undefined },
   });
   return created.id;
 }
