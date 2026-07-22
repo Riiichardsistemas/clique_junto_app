@@ -1,79 +1,36 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut } from 'lucide-react';
+import {
+  LogOut, User, Lock, CreditCard, Info, Mail, Calendar, Hash, ShieldCheck,
+  Eye, EyeOff, ExternalLink, ReceiptText, CheckCircle2, XCircle, Clock, RotateCcw,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { authApi } from '../api/authApi';
+import { paymentApi } from '../api/paymentApi';
 import { setToken } from '../api/axios';
 import AppHeader from '../components/layout/AppHeader';
 
-/* ---------- Ícones ---------- */
-const IconUser = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
-  </svg>
-);
-const IconLock = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
-  </svg>
-);
-const IconInfo = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" />
-  </svg>
-);
-const IconMail = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-10 6L2 7" />
-  </svg>
-);
-const IconCalendar = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" />
-  </svg>
-);
-const IconId = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="8.5" cy="12" r="2.5" /><path d="M14 10h5M14 14h5" />
-  </svg>
-);
-const IconShield = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
-  </svg>
-);
-const IconEye = ({ off }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]">
-    {off ? (
-      <>
-        <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
-        <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
-        <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><path d="m2 2 20 20" />
-      </>
-    ) : (
-      <>
-        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" />
-      </>
-    )}
-  </svg>
-);
+const TABS = [
+  { id: 'perfil', label: 'Perfil', Icon: User },
+  { id: 'pagamentos', label: 'Pagamentos', Icon: CreditCard },
+  { id: 'seguranca', label: 'Segurança', Icon: Lock },
+  { id: 'conta', label: 'Conta', Icon: Info },
+];
 
-/* ---------- Painel de seção (ícone + título + divisor, como no print) ---------- */
-function Section({ icon, title, children, className = '' }) {
-  return (
-    <div className={`card p-5 sm:p-6 ${className}`}>
-      <div className="card-section-header">
-        {icon}
-        <span className="card-section-title">{title}</span>
-      </div>
-      {children}
-    </div>
-  );
-}
+/* Status de pagamento → rótulo, cor e ícone */
+const PAY_STATUS = {
+  paid:     { label: 'Aprovado',    cls: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', Icon: CheckCircle2 },
+  pending:  { label: 'Pendente',    cls: 'text-amber-400 bg-amber-500/10 border-amber-500/20',       Icon: Clock },
+  failed:   { label: 'Recusado',    cls: 'text-red-400 bg-red-500/10 border-red-500/20',             Icon: XCircle },
+  refunded: { label: 'Reembolsado', cls: 'text-sky-300 bg-sky-500/10 border-sky-500/20',             Icon: RotateCcw },
+};
 
-/* ---------- Input de senha com olhinho ---------- */
-function PasswordField({ label, value, onChange, placeholder }) {
+const METHOD_LABEL = {
+  PIX: 'Pix', CREDIT_CARD: 'Cartão', BOLETO: 'Boleto', CREDITO: 'Crédito', UNDEFINED: '—',
+};
+
+function PasswordField({ label, value, onChange }) {
   const [show, setShow] = useState(false);
   return (
     <div>
@@ -85,18 +42,24 @@ function PasswordField({ label, value, onChange, placeholder }) {
           className="input-field pr-11"
           value={value}
           onChange={onChange}
-          placeholder={placeholder}
           autoComplete={label === 'Senha atual' ? 'current-password' : 'new-password'}
         />
-        <button
-          type="button"
-          onClick={() => setShow((s) => !s)}
-          className="icon-button absolute right-1 top-1/2 -translate-y-1/2 border-0 text-cream-dim/70 hover:text-cream"
-          aria-label={show ? 'Ocultar senha' : 'Mostrar senha'}
-        >
-          <IconEye off={show} />
+        <button type="button" onClick={() => setShow((s) => !s)}
+          className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-cream-dim/70 transition hover:text-cream"
+          aria-label={show ? 'Ocultar senha' : 'Mostrar senha'}>
+          {show ? <EyeOff size={17} /> : <Eye size={17} />}
         </button>
       </div>
+    </div>
+  );
+}
+
+/* Cartão de seção compacto */
+function Card({ title, children, className = '' }) {
+  return (
+    <div className={`card p-4 sm:p-5 ${className}`}>
+      {title && <p className="label-mono mb-3 !text-[10px] text-cream/35">{title}</p>}
+      {children}
     </div>
   );
 }
@@ -104,6 +67,7 @@ function PasswordField({ label, value, onChange, placeholder }) {
 export default function AccountSettings() {
   const { user, setUser, logout } = useAuth();
   const navigate = useNavigate();
+  const [tab, setTab] = useState('perfil');
 
   // Perfil
   const [name, setName] = useState(user?.name || '');
@@ -116,7 +80,18 @@ export default function AccountSettings() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordSaving, setPasswordSaving] = useState(false);
 
+  // Pagamentos
+  const [payments, setPayments] = useState(null);
+  const [payError, setPayError] = useState(false);
+
   const initial = (user?.name || user?.email || '?').trim().charAt(0).toUpperCase();
+
+  useEffect(() => {
+    if (tab !== 'pagamentos' || payments !== null) return;
+    paymentApi.mine()
+      .then((d) => setPayments(d.payments || []))
+      .catch(() => { setPayError(true); setPayments([]); });
+  }, [tab, payments]);
 
   async function handleProfileSave(e) {
     e.preventDefault();
@@ -125,7 +100,7 @@ export default function AccountSettings() {
     try {
       const data = await authApi.updateMe({ name: name.trim(), email: email.trim() });
       setUser(data.user);
-      toast.success('Perfil atualizado com sucesso!');
+      toast.success('Perfil atualizado!');
     } catch (err) {
       toast.error(err?.response?.data?.error || 'Erro ao salvar.');
     } finally {
@@ -139,15 +114,11 @@ export default function AccountSettings() {
     if (newPassword !== confirmPassword) { toast.error('As senhas não coincidem.'); return; }
     setPasswordSaving(true);
     try {
-      // A troca de senha invalida os tokens antigos no servidor; guarda o novo
-      // token retornado para manter esta sessao ativa.
       const data = await authApi.updateMe({ currentPassword, password: newPassword });
       if (data?.token) setToken(data.token);
       if (data?.user) setUser(data.user);
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      toast.success('Senha atualizada com sucesso!');
+      setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
+      toast.success('Senha atualizada!');
     } catch (err) {
       toast.error(err?.response?.data?.error || 'Erro ao alterar senha.');
     } finally {
@@ -160,35 +131,48 @@ export default function AccountSettings() {
     navigate('/login', { replace: true });
   }
 
+  const paidTotal = (payments || [])
+    .filter((p) => p.status === 'paid')
+    .reduce((s, p) => s + (p.amountCents || 0), 0);
+
   return (
     <div className="app-shell text-cream">
       <AppHeader />
 
-      <main className="mx-auto max-w-6xl px-4 py-7 animate-fadein sm:px-6 sm:py-10">
-        {/* Cabeçalho — título serifado grande como no print */}
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-gradient font-serif text-3xl font-semibold tracking-tight sm:text-4xl md:text-[42px]">
-            Configurações da Conta
-          </h1>
-          <p className="mt-2 text-sm text-cream-dim">Gerencie seu perfil e segurança.</p>
+      <main className="mx-auto max-w-3xl animate-fadein px-4 py-6 sm:px-6 sm:py-8">
+        {/* Cabeçalho compacto — avatar + nome ao lado (mobile-first) */}
+        <div className="mb-5 flex items-center gap-3.5">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border font-serif text-xl text-gold"
+            style={{
+              borderColor: 'rgba(210,173,120,0.35)',
+              background: 'radial-gradient(circle at 35% 30%, rgba(210,173,120,0.22), rgba(210,173,120,0.06))',
+            }}>
+            {initial}
+          </div>
+          <div className="min-w-0">
+            <h1 className="truncate font-serif text-2xl font-semibold tracking-tight sm:text-[28px]">{user?.name || 'Sua conta'}</h1>
+            <p className="truncate text-[13px] text-cream-dim">{user?.email}</p>
+          </div>
         </div>
 
-        <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
-          {/* Perfil */}
-          <Section icon={<IconUser />} title="Perfil">
+        {/* Abas — pills roláveis */}
+        <div className="scrollbar-hide mb-5 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Seções da conta">
+          {TABS.map(({ id, label, Icon }) => (
+            <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
+              className={`flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-semibold transition ${
+                tab === id
+                  ? 'border-gold bg-gold text-[#1c160c]'
+                  : 'border-line bg-surface text-cream-dim hover:text-cream'}`}>
+              <Icon size={14} />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* ===== Perfil ===== */}
+        {tab === 'perfil' && (
+          <Card title="Dados do perfil" className="animate-fadein">
             <form onSubmit={handleProfileSave} className="space-y-4">
-              <div className="mb-6 flex flex-col items-center gap-3 py-2">
-                <div
-                  className="flex h-24 w-24 items-center justify-center rounded-full border font-serif text-3xl text-gold"
-                  style={{
-                    borderColor: 'rgba(210,173,120,0.35)',
-                    background: 'radial-gradient(circle at 35% 30%, rgba(210,173,120,0.22), rgba(210,173,120,0.06))',
-                    boxShadow: '0 0 0 4px rgba(210,173,120,0.06), 0 16px 40px -18px rgba(210,173,120,0.4)',
-                  }}
-                >
-                  {initial}
-                </div>
-              </div>
               <div>
                 <label className="mb-1.5 block text-[13px] text-cream-dim">Nome</label>
                 <input aria-label="Nome" className="input-field" value={name} onChange={(e) => setName(e.target.value)}
@@ -200,64 +184,130 @@ export default function AccountSettings() {
                   onChange={(e) => setEmail(e.target.value)} placeholder="email@exemplo.com" required />
               </div>
               <button type="submit" disabled={profileSaving} className="btn-primary w-full">
-                {profileSaving ? 'Salvando…' : 'Salvar Alterações'}
+                {profileSaving ? 'Salvando…' : 'Salvar alterações'}
               </button>
             </form>
-          </Section>
+          </Card>
+        )}
 
-          {/* Segurança */}
-          <Section icon={<IconLock />} title="Segurança">
+        {/* ===== Pagamentos ===== */}
+        {tab === 'pagamentos' && (
+          <div className="animate-fadein space-y-3">
+            {/* Resumo */}
+            <div className="grid grid-cols-2 gap-2">
+              <Card>
+                <p className="label-mono !text-[9.5px] text-cream/35">Total pago</p>
+                <p className="mt-1 font-serif text-xl font-semibold text-cream">
+                  {(paidTotal / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </p>
+              </Card>
+              <Card>
+                <p className="label-mono !text-[9.5px] text-cream/35">Cobranças</p>
+                <p className="mt-1 font-serif text-xl font-semibold text-cream">{payments?.length ?? '—'}</p>
+              </Card>
+            </div>
+
+            <Card title="Histórico de pagamentos">
+              {payments === null ? (
+                <div className="flex justify-center py-8">
+                  <span className="h-6 w-6 animate-spin rounded-full border-2 border-cream/15 border-t-cream/60" />
+                </div>
+              ) : payError ? (
+                <p className="py-6 text-center text-[13px] text-cream/40">Não foi possível carregar seus pagamentos.</p>
+              ) : payments.length === 0 ? (
+                <div className="flex flex-col items-center py-10 text-center">
+                  <ReceiptText size={26} className="text-cream/25" />
+                  <p className="mt-3 text-sm font-medium text-cream/60">Nenhum pagamento ainda</p>
+                  <p className="mt-1 text-[13px] text-cream/35">Suas cobranças de eventos aparecem aqui.</p>
+                </div>
+              ) : (
+                <ul className="-my-1 divide-y divide-line/40">
+                  {payments.map((p) => {
+                    const st = PAY_STATUS[p.status] || PAY_STATUS.pending;
+                    const method = METHOD_LABEL[p.billingType] || (p.provider === 'credit' ? 'Crédito' : '—');
+                    return (
+                      <li key={p.id} className="flex items-center gap-3 py-3">
+                        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${st.cls}`}>
+                          <st.Icon size={16} />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[14px] font-semibold text-cream">{p.eventName}</p>
+                          <p className="mt-0.5 truncate text-[11.5px] text-cream/40">
+                            {p.planLabel} · {method} · {new Date(p.createdAt).toLocaleDateString('pt-BR')}
+                          </p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-[14px] font-semibold text-cream">{p.amount}</p>
+                          <span className={`mt-0.5 inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-[10px] font-semibold ${st.cls}`}>
+                            {st.label}
+                          </span>
+                        </div>
+                        {p.invoiceUrl && (
+                          <a href={p.invoiceUrl} target="_blank" rel="noreferrer" aria-label="Ver recibo"
+                            className="ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-cream/40 transition hover:text-cream">
+                            <ExternalLink size={15} />
+                          </a>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Card>
+          </div>
+        )}
+
+        {/* ===== Segurança ===== */}
+        {tab === 'seguranca' && (
+          <Card title="Alterar senha" className="animate-fadein">
             <form onSubmit={handlePasswordSave} className="space-y-4">
-              <PasswordField label="Senha atual" value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)} placeholder="" />
-              <PasswordField label="Nova senha" value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)} placeholder="" />
-              <PasswordField label="Confirmar nova senha" value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)} placeholder="" />
+              <PasswordField label="Senha atual" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+              <PasswordField label="Nova senha" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+              <PasswordField label="Confirmar nova senha" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
               <button type="submit" disabled={passwordSaving} className="btn-primary w-full">
-                {passwordSaving ? 'Atualizando…' : 'Atualizar Senha'}
+                {passwordSaving ? 'Atualizando…' : 'Atualizar senha'}
               </button>
             </form>
-          </Section>
+          </Card>
+        )}
 
-          {/* Informações da Conta */}
-          <Section icon={<IconInfo />} title="Informações da Conta">
-            <div>
-              <div className="info-row">
-                <span className="info-row-label"><IconMail /> Email</span>
-                <span className="info-row-value">{user?.email || '—'}</span>
-              </div>
-              <div className="info-row">
-                <span className="info-row-label"><IconCalendar /> Conta criada</span>
-                <span className="info-row-value">
-                  {user?.createdAt
+        {/* ===== Conta ===== */}
+        {tab === 'conta' && (
+          <div className="animate-fadein space-y-3">
+            <Card title="Informações da conta">
+              <div className="divide-y divide-line/40">
+                {[
+                  [<Mail size={15} />, 'Email', user?.email || '—'],
+                  [<Calendar size={15} />, 'Conta criada', user?.createdAt
                     ? new Date(user.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
-                    : '—'}
-                </span>
+                    : '—'],
+                  [<Hash size={15} />, 'ID da conta', user?.id ? String(user.id).slice(0, 8) : '—'],
+                ].map(([icon, k, v], i) => (
+                  <div key={i} className="flex items-center justify-between gap-3 py-2.5 text-[13px]">
+                    <span className="flex items-center gap-2 text-cream/45">{icon} {k}</span>
+                    <span className="truncate text-right font-medium text-cream">{v}</span>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between gap-3 py-2.5 text-[13px]">
+                  <span className="flex items-center gap-2 text-cream/45"><ShieldCheck size={15} /> Status</span>
+                  <span className="badge-active">Verificada</span>
+                </div>
               </div>
-              <div className="info-row">
-                <span className="info-row-label"><IconId /> ID da conta</span>
-                <span className="info-row-value font-mono text-[13px]">
-                  {user?.id ? String(user.id).slice(0, 8) : '—'}
-                </span>
-              </div>
-              <div className="info-row">
-                <span className="info-row-label"><IconShield /> Status</span>
-                <span className="badge-active">Verificada</span>
-              </div>
-            </div>
-          </Section>
+            </Card>
 
-          <section className="card flex flex-col items-start justify-between gap-4 p-5 sm:flex-row sm:items-center sm:p-6 lg:col-span-3">
-            <div>
-              <h2 className="text-lg text-cream">Sessão</h2>
-              <p className="mt-1 text-sm text-cream-dim">Saia com segurança deste dispositivo.</p>
-            </div>
-            <button type="button" className="btn-danger-ghost mobile-full" onClick={handleLogout}>
-              <LogOut size={16} /> Encerrar sessão
-            </button>
-          </section>
-        </div>
+            <Card>
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-[14px] font-semibold text-cream">Sessão</p>
+                  <p className="mt-0.5 text-[13px] text-cream-dim">Saia com segurança deste dispositivo.</p>
+                </div>
+                <button type="button" className="btn-danger-ghost shrink-0" onClick={handleLogout}>
+                  <LogOut size={16} /> Sair
+                </button>
+              </div>
+            </Card>
+          </div>
+        )}
       </main>
     </div>
   );

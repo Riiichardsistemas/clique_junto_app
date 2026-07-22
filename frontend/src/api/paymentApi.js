@@ -4,6 +4,9 @@ export const paymentApi = {
   // Tabela de planos (pública)
   plans: () => api.get('/payments/plans').then((r) => r.data),
 
+  // Histórico de pagamentos do próprio usuário { payments: [...] }
+  mine: () => api.get('/payments/mine').then((r) => r.data),
+
   // Cria a cobrança (página hospedada) e devolve { free, provider, checkoutUrl, paymentId, ... }
   checkout: (eventId, planId, extra = {}) =>
     api.post('/payments/checkout', { eventId, planId, ...extra }).then((r) => r.data),

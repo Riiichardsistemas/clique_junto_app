@@ -1,13 +1,14 @@
 // Planos visiveis no seletor (em sincronia com backend/src/config/plans.js).
 // capacity = capacidade sugerida de memorias (fotos/videos). 0 = ilimitado.
 // priceCents = null => "Sob consulta" (plano personalizado).
+// maxInstallments = máximo de parcelas no cartão de crédito (1 = à vista).
 export const PLANS = [
-  { id: 'free',          maxGuests: 5,      capacity: 50,   priceCents: 0,     label: 'Grátis' },
-  { id: 'essencial',     maxGuests: 10,     capacity: 100,  priceCents: 4990,  label: 'Essencial' },
-  { id: 'celebracao',    maxGuests: 50,     capacity: 500,  priceCents: 8990,  label: 'Celebração' },
-  { id: 'especial',      maxGuests: 100,    capacity: 1000, priceCents: 15900, label: 'Especial' },
-  { id: 'grande',        maxGuests: 200,    capacity: 2000, priceCents: 29900, label: 'Grande Evento' },
-  { id: 'personalizado', maxGuests: 100000, capacity: 0,    priceCents: null,  label: 'Personalizado', custom: true },
+  { id: 'free',          maxGuests: 5,      capacity: 50,   priceCents: 0,     label: 'Grátis',        maxInstallments: 1 },
+  { id: 'essencial',     maxGuests: 10,     capacity: 100,  priceCents: 4990,  label: 'Essencial',     maxInstallments: 1 },
+  { id: 'celebracao',    maxGuests: 50,     capacity: 500,  priceCents: 8990,  label: 'Celebração',    maxInstallments: 1 },
+  { id: 'especial',      maxGuests: 100,    capacity: 1000, priceCents: 15900, label: 'Especial',      maxInstallments: 3 },
+  { id: 'grande',        maxGuests: 200,    capacity: 2000, priceCents: 29900, label: 'Grande Evento', maxInstallments: 3 },
+  { id: 'personalizado', maxGuests: 100000, capacity: 0,    priceCents: null,  label: 'Personalizado', custom: true, maxInstallments: 1 },
 ];
 
 // Planos antigos — mantidos apenas para resolver rotulos de eventos ja criados.

@@ -14,6 +14,7 @@ router.post('/credit', authMiddleware, userOnlyMiddleware, ctrl.payWithCredit);
 router.post('/pix', authMiddleware, userOnlyMiddleware, ctrl.pixCheckout);
 router.post('/card', authMiddleware, userOnlyMiddleware, ctrl.cardCheckout);
 router.post('/confirm', authMiddleware, userOnlyMiddleware, ctrl.confirmMock); // confirma mock (dev)
+router.get('/mine', authMiddleware, userOnlyMiddleware, ctrl.listMine);
 router.get('/status/:paymentId', authMiddleware, userOnlyMiddleware, ctrl.paymentStatus);
 
 // Webhook do Asaas — precisa do corpo cru (o parse é feito no controller).

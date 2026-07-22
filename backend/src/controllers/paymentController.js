@@ -1,6 +1,6 @@
 const { Event, Plan, User, sequelize } = require('../models');
 const { EVENT_STATUS } = require('../config/constants');
-const { getPlan, isCustomPlan } = require('../config/plans');
+const { getPlan, isCustomPlan, formatBRL } = require('../config/plans');
 const { sendMail } = require('../config/mailer');
 const templates = require('../utils/emailTemplates');
 const asaas = require('../config/asaas');
@@ -359,6 +359,10 @@ async function cardCheckout(req, res, next) {
     const description = `Clique Junto — ${plan.label} — evento "${event.name}"`;
     const remoteIp = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip;
 
+    // Parcelas: limitadas ao máximo permitido pelo plano (1 = à vista).
+    const maxInstallments = plan.maxInstallments || 1;
+    const installments = Math.min(Math.max(1, Number(req.body.installments) || 1), maxInstallments);
+
     if (asaas.useAsaas) {
       try {
         const customerId = await asaas.ensureCustomer({
@@ -369,6 +373,7 @@ async function cardCheckout(req, res, next) {
           card,
           holderInfo: { name: holderInfo.name || req.user.name, email: holderInfo.email || req.user.email, cpfCnpj: holderInfo.cpfCnpj, postalCode: holderInfo.postalCode, addressNumber: holderInfo.addressNumber, phone: holderInfo.phone },
           remoteIp,
+          installments,
         });
         payment.provider = 'asaas';
         payment.providerPaymentId = charge.id;
@@ -494,4 +499,41 @@ async function activatePaidEvent(event, payment, billingType) {
   } catch (e) { /* ignora */ }
 }
 
-module.exports = { checkout, pixCheckout, cardCheckout, confirmMock, paymentStatus, webhook, activatePaidEvent, payWithCredit };
+// GET /api/payments/mine (organizador) — histórico de pagamentos das próprias
+// cobranças (todos os eventos do usuário). Alimenta a aba "Pagamentos" da conta.
+async function listMine(req, res, next) {
+  try {
+    const rows = await Plan.findAll({
+      order: [['createdAt', 'DESC']],
+      include: [{
+        model: Event,
+        as: 'event',
+        attributes: ['id', 'name'],
+        required: true,
+        where: { userId: req.user.id },
+      }],
+    });
+
+    const payments = rows.map((p) => ({
+      id: p.id,
+      planId: p.planId,
+      planLabel: getPlan(p.planId)?.label || p.planId,
+      amountCents: p.amountCents,
+      amount: formatBRL(p.amountCents),
+      provider: p.provider,
+      billingType: p.billingType,
+      status: p.status, // pending | paid | failed | refunded
+      createdAt: p.createdAt,
+      paidAt: p.paidAt,
+      invoiceUrl: p.invoiceUrl,
+      eventId: p.event?.id || null,
+      eventName: p.event?.name || '—',
+    }));
+
+    res.json({ payments });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { checkout, pixCheckout, cardCheckout, confirmMock, paymentStatus, webhook, activatePaidEvent, payWithCredit, listMine };

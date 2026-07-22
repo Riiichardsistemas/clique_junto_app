@@ -143,14 +143,21 @@ async function createPixCharge({ customerId, amountCents, description, externalR
  * card = { holderName, number, expiryMonth, expiryYear, ccv }
  * holderInfo = { name, email, cpfCnpj, postalCode, addressNumber, phone }
  */
-async function createCardCharge({ customerId, amountCents, description, externalReference, card, holderInfo, remoteIp }) {
+async function createCardCharge({ customerId, amountCents, description, externalReference, card, holderInfo, remoteIp, installments }) {
   const dueDate = new Date().toISOString().slice(0, 10);
+  const total = Number((amountCents / 100).toFixed(2));
+  const parcels = Math.max(1, Number(installments) || 1);
+  // À vista (1x) usa 'value'. Parcelado (2x+) usa installmentCount + totalValue,
+  // conforme a API do Asaas (a última parcela absorve o arredondamento).
+  const amountFields = parcels >= 2
+    ? { installmentCount: parcels, totalValue: total }
+    : { value: total };
   const payment = await asaasFetch('/payments', {
     method: 'POST',
     body: {
       customer: customerId,
       billingType: 'CREDIT_CARD',
-      value: Number((amountCents / 100).toFixed(2)),
+      ...amountFields,
       dueDate,
       description,
       externalReference,

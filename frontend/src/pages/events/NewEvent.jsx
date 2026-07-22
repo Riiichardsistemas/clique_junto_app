@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ChevronLeft, Check, Heart, PartyPopper, Cake, Briefcase, Plane, Camera as CameraIcon, Aperture,
+  ChevronLeft, ChevronRight, Check, Heart, PartyPopper, Cake, Briefcase, Plane, Camera as CameraIcon, Aperture,
   Palette, MessageSquare, UploadCloud, X, MapPin,
 } from 'lucide-react';
 import { eventApi } from '../../api/eventApi';
@@ -11,7 +11,6 @@ import PlanSelector from '../../components/PlanSelector';
 import FilterSelector from '../../components/FilterSelector';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
-import Brand from '../../components/ui/Brand';
 import LogoMark from '../../components/ui/LogoMark.jsx';
 import { PLANS, formatBRL } from '../../utils/plans';
 
@@ -139,28 +138,39 @@ export default function NewEvent() {
   return (
     <div className="app-screen flex flex-col text-cream">
       <header className="app-topbar glass sticky top-0 z-20">
-        <div className="mx-auto flex min-h-[56px] max-w-2xl items-center justify-between px-4 sm:px-6">
+        <div className="mx-auto flex min-h-[60px] max-w-2xl items-center gap-3 px-3 py-1.5 sm:px-6">
+          {/* Voltar: recua etapa; no passo 0, sai para os eventos */}
           <button
             type="button"
-            onClick={() => navigate('/dashboard')}
-            className="inline-flex min-h-11 items-center gap-1 rounded-full px-2 text-sm text-cream-dim transition hover:text-cream"
+            onClick={() => (step === 0 ? navigate('/dashboard') : setStep((s) => s - 1))}
+            aria-label="Voltar"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-cream-dim transition hover:text-cream"
           >
-            <ChevronLeft size={16} />
-            Voltar
+            <ChevronLeft size={18} />
           </button>
-          <Brand compact className="[&_svg]:h-[22px] [&_svg]:w-[22px]" />
-          <span className="w-16" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[15px] font-semibold leading-tight text-cream">Novo evento</p>
+            <p className="mt-0.5 truncate font-mono text-[11px] uppercase tracking-wider text-cream/40">
+              Etapa {step + 1} de {STEPS.length} · {STEPS[step]}
+            </p>
+          </div>
+          {/* Pular: só nas etapas opcionais (datas e personalização) */}
+          {(step === 1 || step === 2) ? (
+            <button type="button" onClick={() => setStep((s) => s + 1)}
+              className="shrink-0 px-2 text-sm font-medium text-gold underline-offset-4 transition hover:underline">
+              Pular
+            </button>
+          ) : (
+            <span className="w-8 shrink-0" />
+          )}
         </div>
       </header>
 
       {/* Coluna flex sem padding-bottom no mobile: o conteúdo (flex-1) empurra a
           barra sticky de navegação para o rodapé mesmo em passos curtos */}
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-6 sm:px-6 sm:py-10">
-        {/* Progresso — steps segmentados */}
-        <div className="mb-8 sm:mb-12">
-          <p className="mb-3 font-mono text-[10px] uppercase tracking-wider text-cream-dim/60">
-            Etapa {step + 1} de {STEPS.length}
-          </p>
+      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-5 sm:px-6 sm:py-10">
+        {/* Progresso — barra segmentada logo abaixo do cabeçalho (mockup) */}
+        <div className="mb-7 sm:mb-10">
           <div className="flex items-center gap-2" role="progressbar" aria-label="Progresso da criação do evento" aria-valuemin="1" aria-valuemax={STEPS.length} aria-valuenow={step + 1}>
             {STEPS.map((s, i) => (
               <div key={s} className="flex flex-1 flex-col gap-2">
@@ -174,7 +184,6 @@ export default function NewEvent() {
               </div>
             ))}
           </div>
-          <p className="mt-2 font-mono text-[10px] uppercase tracking-wider text-cream/85 sm:hidden">{STEPS[step]}</p>
         </div>
 
         <div className="flex-1">
@@ -214,28 +223,47 @@ export default function NewEvent() {
                 <p className="mt-2 text-sm text-cream-dim">Defina as datas e limites do álbum.</p>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-cream-dim">Início do evento</label>
-                  <input aria-label="Início do evento" type="datetime-local" value={form.startsAt} onChange={(e) => set('startsAt', e.target.value)} className="input-field" />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-cream-dim">Encerramento (para de aceitar fotos)</label>
-                  <input aria-label="Encerramento do evento" type="datetime-local" value={form.endsAt} onChange={(e) => set('endsAt', e.target.value)} className="input-field" />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="mb-1.5 block text-sm font-medium text-cream-dim">Revelação (quando as fotos aparecem)</label>
-                  <input aria-label="Revelação do álbum" type="datetime-local" value={form.revealAt} onChange={(e) => set('revealAt', e.target.value)} className="input-field" />
-                  <p className="mt-1.5 text-xs text-cream-dim/70">Deixe vazio para o álbum ficar visível desde o início.</p>
+              {/* Card DATAS */}
+              <div className="card space-y-5 p-4 sm:p-5">
+                <p className="label-mono !text-[10px] text-cream/35">Datas</p>
+
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label className="mb-2 block text-sm font-semibold text-cream">Início do evento</label>
+                    <input aria-label="Início do evento" type="datetime-local" value={form.startsAt} onChange={(e) => set('startsAt', e.target.value)} className="input-field" />
+                    <p className="mt-1.5 text-xs text-cream-dim/70">Quando os convidados podem começar a enviar fotos.</p>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <div className="mb-2 flex items-baseline justify-between">
+                      <label className="text-sm font-semibold text-cream">Encerramento</label>
+                      <span className="text-xs text-cream/35">Opcional</span>
+                    </div>
+                    <input aria-label="Encerramento do evento" type="datetime-local" value={form.endsAt} onChange={(e) => set('endsAt', e.target.value)} className="input-field" />
+                    <p className="mt-1.5 text-xs text-cream-dim/70">Depois disso o álbum para de aceitar fotos.</p>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <div className="mb-2 flex items-baseline justify-between">
+                      <label className="text-sm font-semibold text-cream">Revelação</label>
+                      <span className="text-xs text-cream/35">Opcional</span>
+                    </div>
+                    <input aria-label="Revelação do álbum" type="datetime-local" value={form.revealAt} onChange={(e) => set('revealAt', e.target.value)} className="input-field" />
+                    <p className="mt-1.5 text-xs text-cream-dim/70">Deixe vazio para o álbum ficar visível desde o início.</p>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="mb-3 block text-sm font-medium text-cream-dim">Fotos por convidado</label>
-                <div className="flex flex-wrap gap-2">
+              {/* Card FOTOS POR CONVIDADO — com o valor selecionado no topo (mockup) */}
+              <div className="card p-4 sm:p-5">
+                <div className="mb-3 flex items-baseline justify-between">
+                  <p className="label-mono !text-[10px] text-cream/35">Fotos por convidado</p>
+                  <span className="text-[13px] font-semibold text-gold">
+                    {form.photoLimitPerGuest === 0 ? 'Ilimitado' : `${form.photoLimitPerGuest} fotos`}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
                   {PHOTO_LIMITS.map((l) => (
                     <button key={l.value} type="button" aria-pressed={form.photoLimitPerGuest === l.value} onClick={() => set('photoLimitPerGuest', l.value)}
-                      className={`rounded-full border px-4 py-2 text-sm font-medium transition-all ${
+                      className={`min-h-11 rounded-full border text-sm font-medium transition-all ${
                         form.photoLimitPerGuest === l.value
                           ? 'border-gold/70 bg-gold text-[#1c160c]'
                           : 'border-line text-cream-dim hover:border-gold/40 hover:text-cream'}`}>
@@ -245,8 +273,9 @@ export default function NewEvent() {
                 </div>
               </div>
 
-              <div>
-                <label className="mb-3 block text-sm font-medium text-cream-dim">Filtro fotográfico padrão</label>
+              {/* Card FILTRO PADRÃO */}
+              <div className="card p-4 sm:p-5">
+                <p className="label-mono mb-3 !text-[10px] text-cream/35">Filtro fotográfico padrão</p>
                 <FilterSelector value={form.defaultFilter} onChange={(v) => set('defaultFilter', v)} />
               </div>
             </motion.div>
@@ -489,28 +518,23 @@ export default function NewEvent() {
         </AnimatePresence>
         </div>
 
-        {/* Navegação */}
-        <div className="mobile-action-bar mt-10 flex items-center justify-between gap-2">
-          <Button variant="ghost" className="!px-4 sm:!px-6" onClick={() => setStep((s) => s - 1)} disabled={step === 0}>
+        {/* Navegação — Voltar (contorno) · Continuar (pill claro), como no mockup */}
+        <div className="mobile-action-bar mt-10 flex items-center gap-3">
+          <Button variant="ghost" className="!rounded-full !px-6" onClick={() => setStep((s) => s - 1)} disabled={step === 0}>
             <ChevronLeft size={16} />
-            <span className="hidden min-[360px]:inline">Voltar</span>
+            Voltar
           </Button>
-          <div className="flex min-w-0 items-center gap-2 sm:gap-4">
-            {step === 2 && (
-              <button type="button" onClick={() => setStep(3)} className="min-h-11 px-1 text-xs text-cream-dim underline-offset-4 transition hover:text-cream hover:underline sm:text-sm">
-                <span className="sm:hidden">Depois</span><span className="hidden sm:inline">Personalizar depois</span>
-              </button>
-            )}
-            {step < STEPS.length - 1 ? (
-              <Button className="!px-5 sm:!px-6" onClick={() => setStep((s) => s + 1)} disabled={step === 0 && !form.name.trim()}>
-                Continuar
-              </Button>
-            ) : (
-              <Button className="!px-5 sm:!px-6" onClick={submit} loading={loading} disabled={loading}>
-                {loading ? 'Criando...' : 'Criar evento'}
-              </Button>
-            )}
-          </div>
+          <div className="flex-1" />
+          {step < STEPS.length - 1 ? (
+            <Button className="!min-w-[52%] !rounded-full !px-6" onClick={() => setStep((s) => s + 1)} disabled={step === 0 && !form.name.trim()}>
+              Continuar
+              <ChevronRight size={16} />
+            </Button>
+          ) : (
+            <Button className="!min-w-[52%] !rounded-full !px-6" onClick={submit} loading={loading} disabled={loading}>
+              {loading ? 'Criando...' : 'Criar evento'}
+            </Button>
+          )}
         </div>
       </main>
     </div>

@@ -196,6 +196,7 @@ export default function Checkout() {
             )}
             {method === 'card' && (
               <CardPanel eventId={id} planId={event.planId} defaultCpf={user?.cpfCnpj || ''}
+                maxInstallments={plan?.maxInstallments || 1} amountCents={plan?.priceCents || 0}
                 onBack={() => setMethod(null)} onPaid={onPaid} />
             )}
             </>
@@ -361,13 +362,21 @@ function PixPanel({ eventId, planId, onBack, onPaid, onNeedCpf }) {
 }
 
 /* ---------------- Cartão ---------------- */
-function CardPanel({ eventId, planId, onBack, onPaid, defaultCpf = '' }) {
+function CardPanel({ eventId, planId, onBack, onPaid, defaultCpf = '', maxInstallments = 1, amountCents = 0 }) {
   const [f, setF] = useState({
     holderName: '', number: '', expiry: '', ccv: '',
     cpfCnpj: maskCpfCnpj(defaultCpf), postalCode: '', addressNumber: '', phone: '',
   });
+  const [installments, setInstallments] = useState(1);
   const [sending, setSending] = useState(false);
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+
+  // Opções de parcelamento (ex.: 1x, 2x, 3x) com o valor de cada parcela.
+  const installmentOptions = Array.from({ length: Math.max(1, maxInstallments) }, (_, i) => {
+    const n = i + 1;
+    const per = amountCents / n;
+    return { n, label: n === 1 ? `À vista — ${formatBRL(amountCents)}` : `${n}x de ${formatBRL(Math.round(per))} sem juros` };
+  });
 
   async function submit(e) {
     e.preventDefault();
@@ -380,6 +389,7 @@ function CardPanel({ eventId, planId, onBack, onPaid, defaultCpf = '' }) {
       const d = await paymentApi.card(eventId, planId, {
         card: { holderName: f.holderName, number: onlyDigits(f.number), expiryMonth: mm, expiryYear, ccv: onlyDigits(f.ccv) },
         holderInfo: { cpfCnpj: onlyDigits(f.cpfCnpj), postalCode: onlyDigits(f.postalCode), addressNumber: f.addressNumber, phone: onlyDigits(f.phone) },
+        installments,
       });
       if (d.status === 'paid') onPaid();
       else toast('Pagamento em processamento. Avisaremos ao confirmar.', { icon: '⏳' });
@@ -397,6 +407,22 @@ function CardPanel({ eventId, planId, onBack, onPaid, defaultCpf = '' }) {
         <ChevronLeft size={15} /> Outros métodos
       </button>
       <h3 className="text-lg font-semibold">Pague com cartão</h3>
+
+      {maxInstallments > 1 && (
+        <div>
+          <label className="mb-1 block text-xs text-cream-dim">Parcelamento</label>
+          <select
+            aria-label="Parcelamento"
+            className={inp}
+            value={installments}
+            onChange={(e) => setInstallments(Number(e.target.value))}
+          >
+            {installmentOptions.map((o) => (
+              <option key={o.n} value={o.n}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div>
         <label className="mb-1 block text-xs text-cream-dim">Nome impresso no cartão</label>
