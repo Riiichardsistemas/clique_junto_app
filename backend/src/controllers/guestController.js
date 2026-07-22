@@ -60,17 +60,32 @@ async function join(req, res, next) {
       return res.status(403).json({ error: 'Este evento ainda nao foi ativado.' });
     }
 
-    // Limite de participantes do plano
+    // Email é obrigatório: identifica o convidado se ele voltar por outro
+    // navegador/aparelho, preservando o contador de fotos (sem "vaga" nova).
+    const trimmed = String(email || '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      return res.status(400).json({ error: 'Informe um email válido para entrar.' });
+    }
+    const guestEmail = trimmed;
+
+    // Convidado retornando — recupera a sessão existente em vez de criar outra
+    const existing = await Guest.findOne({ where: { eventId: event.id, email: guestEmail } });
+    if (existing) {
+      if (existing.isBanned) {
+        return res.status(403).json({ error: 'Acesso removido pelo organizador.' });
+      }
+      if (nickname) {
+        existing.nickname = String(nickname).trim().slice(0, 40);
+        await existing.save();
+      }
+      const token = generateGuestToken(existing);
+      return res.json({ guest: existing, token, event: publicEvent(event), returning: true });
+    }
+
+    // Limite de participantes do plano (só para convidados novos)
     const guestCount = await Guest.count({ where: { eventId: event.id } });
     if (guestCount >= event.maxGuests) {
       return res.status(403).json({ error: 'Este evento atingiu o limite de participantes.' });
-    }
-
-    // Valida email se fornecido
-    let guestEmail = null;
-    if (email) {
-      const trimmed = String(email).trim().toLowerCase();
-      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) guestEmail = trimmed;
     }
 
     const guest = await Guest.create({

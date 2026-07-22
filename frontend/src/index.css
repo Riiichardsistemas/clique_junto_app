@@ -417,15 +417,12 @@
   }
 }
 
-/* Em celulares deitados, a câmera vira uma interface em dois painéis.
-   Assim o visor e todos os comandos continuam acessíveis sem rolagem. */
+/* Em celulares deitados, a câmera vira uma interface em dois painéis:
+   visor à esquerda, cluster de controles vira painel lateral à direita. */
 @media (orientation: landscape) and (max-height: 500px) {
-  .camera-app {
-    --camera-panel: clamp(248px, 38vw, 300px);
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) var(--camera-panel);
-    grid-template-rows: auto auto minmax(0, 1fr);
-  }
+  .camera-app { --camera-panel: clamp(264px, 38vw, 320px); }
+
+  .camera-viewfinder { right: var(--camera-panel); }
 
   .camera-bar {
     right: var(--camera-panel);
@@ -433,46 +430,38 @@
     padding-left: 1rem;
   }
 
-  .camera-viewfinder {
-    grid-column: 1;
-    grid-row: 1 / 4;
-    min-height: 0;
-  }
+  .camera-brackets { display: none; }
 
-  .camera-filter-strip {
-    grid-column: 2;
-    grid-row: 1;
-    min-width: 0;
-    border-top: 0;
+  .camera-bottom {
+    top: 0;
+    bottom: 0;
+    left: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: var(--camera-panel);
+    padding-top: .75rem;
     border-left: 1px solid rgba(246, 238, 221, .06);
+    background-color: rgba(10, 10, 11, .94);
+    background-image: none;
   }
 
-  .camera-filter-strip > div { padding: .625rem .75rem; }
+  .camera-filter-strip { min-width: 0; }
 
-  .camera-mode-switcher {
-    grid-column: 2;
-    grid-row: 2;
-    border-left: 1px solid rgba(246, 238, 221, .06);
-    padding-top: .625rem;
-  }
+  .camera-mode-switcher { padding-top: .625rem; }
 
   .camera-controls {
-    grid-column: 2;
-    grid-row: 3;
-    min-height: 0;
-    align-self: stretch;
-    border-left: 1px solid rgba(246, 238, 221, .06);
     padding: 1rem 1.25rem max(.75rem, env(safe-area-inset-bottom));
   }
 
   .camera-controls > button:nth-of-type(2) {
-    width: 4.5rem;
-    height: 4.5rem;
+    width: 4.25rem;
+    height: 4.25rem;
   }
 
   .camera-controls > button:nth-of-type(2) > span {
-    width: 3rem;
-    height: 3rem;
+    width: 3.25rem;
+    height: 3.25rem;
   }
 }
 

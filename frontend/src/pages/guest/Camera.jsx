@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { X, ImagePlus, SwitchCamera } from 'lucide-react';
+import { Images, ImagePlus, SwitchCamera } from 'lucide-react';
 import { guestApi } from '../../api/guestApi';
 import { FILTER_DEFS, applyFilterToBlob } from '../../utils/filters';
 import { enqueueUpload, subscribeQueue, processQueue } from '../../utils/uploadQueue';
@@ -8,15 +8,21 @@ import PageLoader from '../../components/ui/PageLoader';
 
 const MAX_VIDEO_SECONDS = 15;
 
-// Filtros disponíveis no visor (ids válidos no backend) com rótulos de filme
+// Filtros disponíveis no visor (ids válidos no backend) com rótulos de filme.
+// `short` é a legenda do swatch circular; `label` aparece no visor.
 const CAMERA_FILTERS = [
-  { id: 'nenhum',   label: 'Normal',          tag: 'Digital' },
-  { id: 'kodak',    label: 'Kodak Gold 200',  tag: 'Kodak' },
-  { id: 'pb',       label: 'Preto & branco',  tag: 'Mono' },
-  { id: 'polaroid', label: 'Polaroid',        tag: 'Instant' },
-  { id: 'vintage',  label: 'Sépia',           tag: 'Vintage' },
-  { id: 'cinema',   label: 'Cinema',          tag: 'Film' },
+  { id: 'nenhum',   label: 'Normal',          short: 'Normal',   tag: 'Digital' },
+  { id: 'kodak',    label: 'Kodak Gold 200',  short: 'Kodak',    tag: 'Kodak' },
+  { id: 'pb',       label: 'Preto & branco',  short: 'P&B',      tag: 'Mono' },
+  { id: 'polaroid', label: 'Polaroid',        short: 'Polaroid', tag: 'Instant' },
+  { id: 'vintage',  label: 'Sépia',           short: 'Sépia',    tag: 'Vintage' },
+  { id: 'cinema',   label: 'Cinema',          short: 'Cinema',   tag: 'Film' },
 ].map((f) => ({ ...f, css: FILTER_DEFS[f.id]?.cssFilter || 'none' }));
+
+// Amostra colorida usada nos swatches — os filtros CSS aplicados sobre ela
+// tornam a diferença entre eles visível antes de escolher
+const SWATCH_SAMPLE =
+  'conic-gradient(from 210deg at 50% 42%, #f2c98a, #d96f4e 28%, #7ea4a0 55%, #46557a 78%, #f2c98a)';
 
 async function compressImage(file, maxDim = 1600, quality = 0.82) {
   return new Promise((resolve) => {
@@ -43,8 +49,10 @@ async function compressImage(file, maxDim = 1600, quality = 0.82) {
 
 function PreviewScreen({ previewUrl, onRetake, onUpload, uploading, filter, isVideo }) {
   return (
-    <div className="app-screen flex flex-col bg-ink-deep">
-      <div className="relative flex-1 overflow-hidden">
+    // h-[100dvh] (e não min-h): trava na altura visível do viewport — a imagem
+    // encolhe e os botões nunca ficam cortados sob a barra do navegador
+    <div className="flex h-[100dvh] flex-col bg-ink-deep">
+      <div className="relative min-h-0 flex-1 overflow-hidden">
         {isVideo ? (
           <video src={previewUrl} autoPlay loop playsInline controls={false}
             className="h-full w-full object-cover" style={{ filter: filter?.css }} />
@@ -288,10 +296,14 @@ export default function Camera() {
         durationSeconds: capturedMeta.durationSeconds || null,
       });
 
+      const isFirst = photoCount === 0;
       setPhotoCount((c) => c + 1);
       handleRetake();
-      showToast(navigator.onLine ? (isVideo ? 'Vídeo guardado' : 'Foto guardada')
-        : 'Guardado! Envia quando a conexão voltar');
+      showToast(!navigator.onLine
+        ? 'Guardado! Envia quando a conexão voltar'
+        : isFirst
+          ? `${isVideo ? 'Vídeo guardado' : 'Foto guardada'} — veja em “Álbum”, no topo`
+          : (isVideo ? 'Vídeo guardado' : 'Foto guardada'));
     } catch {
       showToast('Erro ao guardar. Tente novamente.', 'error');
     } finally {
@@ -348,7 +360,8 @@ export default function Camera() {
   }
 
   return (
-    <div className="camera-app relative flex h-[100dvh] select-none flex-col overflow-hidden bg-ink-deep">
+    // Visor em tela cheia, controles sobrepostos — como a câmera nativa do iPhone
+    <div className="camera-app relative h-[100dvh] select-none overflow-hidden bg-ink-deep">
       {flashActive && <div className="pointer-events-none absolute inset-0 z-50 bg-white" style={{ animation: 'fadein 0.06s ease' }} />}
 
       {toast && (
@@ -358,30 +371,8 @@ export default function Camera() {
         </div>
       )}
 
-      {/* Top bar */}
-      <div className="camera-bar safe-top absolute inset-x-0 top-0 z-20 flex items-center justify-between px-5">
-        <span className="film-counter text-cream/70">{clock}</span>
-        <div className="flex items-center gap-2">
-          {queue.pending > 0 && (
-            <span className="flex items-center gap-1.5 rounded-full border border-gold/30 bg-ink/50 px-3 py-1 text-[11px] text-gold/90 backdrop-blur-sm">
-              {queue.sending && <span className="h-2.5 w-2.5 animate-spin rounded-full border border-gold/30 border-t-gold" />}
-              {queue.sending ? `Enviando ${queue.pending}…` : `${queue.pending} na fila`}
-            </span>
-          )}
-          {recording && (
-            <span className="flex items-center gap-1.5 rounded-full bg-red-500/90 px-3 py-1 text-[11px] font-semibold text-white">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
-              {String(recordSecs).padStart(2, '0')}s / {MAX_VIDEO_SECONDS}s
-            </span>
-          )}
-          <Link to={`/e/${slug}/album`} aria-label="Sair da câmera e abrir o álbum" className="icon-button border-white/15 bg-black/40 text-white/70 backdrop-blur-md hover:text-white">
-            <X size={16} />
-          </Link>
-        </div>
-      </div>
-
-      {/* Viewfinder */}
-      <div className="camera-viewfinder relative flex-1 overflow-hidden bg-ink-deep">
+      {/* Viewfinder — ocupa a tela toda; os controles flutuam por cima */}
+      <div className="camera-viewfinder absolute inset-0 overflow-hidden bg-ink-deep">
         <video ref={videoRef} autoPlay playsInline muted
           className="h-full w-full object-cover"
           style={{ filter: activeFilter.css, transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
@@ -395,8 +386,9 @@ export default function Camera() {
           </div>
         )}
 
-        {/* Corner brackets */}
-        <div className="pointer-events-none absolute inset-5">
+        {/* Corner brackets — na área livre entre a barra do topo e os controles */}
+        <div className="camera-brackets pointer-events-none absolute inset-x-5"
+          style={{ top: 'calc(env(safe-area-inset-top) + 4rem)', bottom: 'calc(16.5rem + env(safe-area-inset-bottom))' }}>
           <span className="absolute left-0 top-0 h-10 w-10 border-l-2 border-t-2 border-cream/50" />
           <span className="absolute right-0 top-0 h-10 w-10 border-r-2 border-t-2 border-cream/50" />
           <span className="absolute bottom-0 left-0 h-10 w-10 border-b-2 border-l-2 border-cream/50" />
@@ -405,77 +397,113 @@ export default function Camera() {
 
         {/* Frame counter (motivo de filme) */}
         <div className="camera-top-offset absolute right-6 text-right">
-          <p className="label-mono text-gold/90">Frames</p>
-          <p className="font-mono text-lg text-cream/90">
+          <p className="label-mono text-gold/90 [text-shadow:0_1px_8px_rgba(0,0,0,.8)]">Frames</p>
+          <p className="font-mono text-lg text-cream/90 [text-shadow:0_1px_8px_rgba(0,0,0,.8)]">
             {String(photoCount).padStart(2, '0')}
             <span className="text-cream/40"> / {unlimited ? '∞' : String(maxPhotos).padStart(2, '0')}</span>
           </p>
           {!unlimited && remaining <= 5 && remaining > 0 && (
-            <p className="label-mono mt-1 text-amber-300">Últimas {remaining}</p>
+            <p className="label-mono mt-1 text-amber-300 [text-shadow:0_1px_8px_rgba(0,0,0,.8)]">Últimas {remaining}</p>
           )}
         </div>
+      </div>
 
-        {/* Nome do filme/filtro */}
-        <div className="absolute bottom-6 left-6">
-          <p className="font-serif text-xl text-cream">{activeFilter.label}</p>
-          <p className="label-mono mt-0.5 text-gold/80">{activeFilter.tag}</p>
+      {/* Top bar */}
+      <div className="camera-bar safe-top absolute inset-x-0 top-0 z-20 flex items-center justify-between px-5">
+        <span className="film-counter text-cream/70 [text-shadow:0_1px_8px_rgba(0,0,0,.8)]">{clock}</span>
+        <div className="flex items-center gap-2">
+          {queue.pending > 0 && (
+            <span className="flex items-center gap-1.5 rounded-full border border-gold/30 bg-ink/50 px-3 py-1 text-[11px] text-gold/90 backdrop-blur-sm">
+              {queue.sending && <span className="h-2.5 w-2.5 animate-spin rounded-full border border-gold/30 border-t-gold" />}
+              {queue.sending ? `Enviando ${queue.pending}…` : `${queue.pending} na fila`}
+            </span>
+          )}
+          {recording && (
+            <span className="flex items-center gap-1.5 rounded-full bg-red-500/90 px-3 py-1 text-[11px] font-semibold text-white">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
+              {String(recordSecs).padStart(2, '0')}s / {MAX_VIDEO_SECONDS}s
+            </span>
+          )}
+          {/* Saída rotulada — deixa claro que dá para ver as fotos e voltar depois */}
+          <Link to={`/e/${slug}/album`} aria-label="Sair da câmera e abrir o álbum"
+            className="flex min-h-11 items-center gap-1.5 rounded-full border border-white/20 bg-black/45 px-4 text-[13px] font-semibold text-white/85 backdrop-blur-md transition hover:text-white">
+            <Images size={14} />
+            Álbum
+          </Link>
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="camera-filter-strip border-t border-cream/[0.06] bg-ink-deep">
-        <div className="scrollbar-hide flex gap-2 overflow-x-auto px-5 py-3">
-          {CAMERA_FILTERS.map((f) => (
-            <button key={f.id} type="button" aria-pressed={activeFilter.id === f.id} onClick={() => setActiveFilter(f)}
-              className={`min-h-11 flex-shrink-0 rounded-xl px-3.5 text-xs font-medium transition-all ${
-                activeFilter.id === f.id ? 'bg-gold text-ink' : 'border border-cream/15 text-cream/55 hover:text-cream/85'}`}
-            >
-              {f.label}
-            </button>
-          ))}
+      {/* ===== Cluster inferior — flutua sobre o visor com véu de gradiente ===== */}
+      <div className="camera-bottom absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/85 via-black/55 to-transparent pt-8">
+        {/* Nome do filme ativo */}
+        <p className="camera-film-name mb-2 text-center [text-shadow:0_1px_8px_rgba(0,0,0,.8)]">
+          <span className="font-serif text-[15px] text-cream">{activeFilter.label}</span>
+          <span className="label-mono ml-2 text-gold/80">{activeFilter.tag}</span>
+        </p>
+
+        {/* Filtros — swatches circulares com o efeito aplicado na amostra */}
+        <div className="camera-filter-strip">
+          <div className="scrollbar-hide flex gap-3 overflow-x-auto px-5 pb-1 pt-1">
+            {CAMERA_FILTERS.map((f) => {
+              const active = activeFilter.id === f.id;
+              return (
+                <button key={f.id} type="button" aria-pressed={active} aria-label={`Filtro ${f.label}`}
+                  onClick={() => setActiveFilter(f)}
+                  className="flex flex-shrink-0 flex-col items-center gap-1.5 first:ml-auto last:mr-auto">
+                  <span className={`block h-12 w-12 overflow-hidden rounded-full border-2 transition-all ${
+                    active ? 'scale-105 border-gold shadow-[0_0_14px_rgba(196,169,108,.45)]' : 'border-white/25'}`}>
+                    <span className="block h-full w-full" style={{ background: SWATCH_SAMPLE, filter: f.css }} />
+                  </span>
+                  <span className={`text-[10px] font-medium transition-colors ${active ? 'text-gold' : 'text-cream/60'}`}>
+                    {f.short}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
 
-      {/* Seletor foto/vídeo */}
-      <div className="camera-mode-switcher flex justify-center border-t border-cream/[0.06] bg-ink-deep pt-3">
-        <div className="flex gap-1 rounded-full border border-cream/10 bg-cream/[0.04] p-1">
-          {[{ id: 'photo', label: 'Foto' }, { id: 'video', label: `Vídeo ${MAX_VIDEO_SECONDS}s` }].map((m) => (
-            <button key={m.id} type="button" aria-pressed={mode === m.id} onClick={() => !recording && setMode(m.id)}
-              className={`min-h-11 rounded-full px-4 text-xs font-medium transition ${
-                mode === m.id ? 'bg-gold text-ink' : 'text-cream/50 hover:text-cream/80'}`}>
-              {m.label}
-            </button>
-          ))}
+        {/* Seletor foto/vídeo */}
+        <div className="camera-mode-switcher flex justify-center pt-2">
+          <div className="flex gap-1 rounded-full border border-white/10 bg-black/35 p-1 backdrop-blur-sm">
+            {[{ id: 'photo', label: 'Foto' }, { id: 'video', label: `Vídeo ${MAX_VIDEO_SECONDS}s` }].map((m) => (
+              <button key={m.id} type="button" aria-pressed={mode === m.id} onClick={() => !recording && setMode(m.id)}
+                className={`min-h-10 rounded-full px-4 text-xs font-semibold transition ${
+                  mode === m.id ? 'bg-gold text-ink' : 'text-cream/60 hover:text-cream/85'}`}>
+                {m.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* Controles */}
-      <div className="camera-controls safe-bottom flex items-center justify-between bg-ink-deep px-8 pt-5 sm:px-10">
-        <button type="button" aria-label="Escolher foto da galeria" onClick={() => fileRef.current?.click()} disabled={recording}
-          className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/15 bg-white/[0.04] text-white/60 transition hover:bg-white/[0.08] hover:text-white disabled:opacity-30">
-          <ImagePlus size={21} strokeWidth={1.7} />
-        </button>
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
-
-        {mode === 'photo' ? (
-          <button type="button" aria-label="Tirar foto" onClick={capturePhoto} disabled={remaining <= 0 || cameraError}
-            className="relative flex h-20 w-20 items-center justify-center rounded-full border-4 border-cream/30 transition active:scale-95 disabled:opacity-30">
-            <span className="h-14 w-14 rounded-full bg-cream" />
+        {/* Controles */}
+        <div className="camera-controls safe-bottom flex items-center justify-between px-8 pt-3 sm:px-10">
+          <button type="button" aria-label="Escolher foto da galeria" onClick={() => fileRef.current?.click()} disabled={recording}
+            className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/20 bg-black/35 text-white/70 backdrop-blur-sm transition hover:bg-white/[0.08] hover:text-white disabled:opacity-30">
+            <ImagePlus size={21} strokeWidth={1.7} />
           </button>
-        ) : (
-          <button type="button" aria-label={recording ? 'Parar gravação' : 'Gravar vídeo'} onClick={recording ? stopRecording : startRecording} disabled={remaining <= 0 || cameraError}
-            className={`relative flex h-20 w-20 items-center justify-center rounded-full border-4 transition active:scale-95 disabled:opacity-30 ${
-              recording ? 'border-red-400/70' : 'border-cream/30'}`}>
-            <span className={`transition-all ${recording
-              ? 'h-8 w-8 rounded-lg bg-red-500'
-              : 'h-14 w-14 rounded-full bg-red-500'}`} />
-          </button>
-        )}
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
 
-        <button type="button" aria-label="Alternar câmera" onClick={flipCamera} disabled={recording || cameraError}
-          className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/15 bg-white/[0.04] text-white/60 transition hover:bg-white/[0.08] hover:text-white disabled:opacity-30">
-          <SwitchCamera size={21} strokeWidth={1.7} />
-        </button>
+          {mode === 'photo' ? (
+            <button type="button" aria-label="Tirar foto" onClick={capturePhoto} disabled={remaining <= 0 || cameraError}
+              className="relative flex h-[76px] w-[76px] items-center justify-center rounded-full border-4 border-white/85 transition active:scale-95 disabled:opacity-30">
+              <span className="h-[62px] w-[62px] rounded-full bg-white transition active:scale-90" />
+            </button>
+          ) : (
+            <button type="button" aria-label={recording ? 'Parar gravação' : 'Gravar vídeo'} onClick={recording ? stopRecording : startRecording} disabled={remaining <= 0 || cameraError}
+              className={`relative flex h-[76px] w-[76px] items-center justify-center rounded-full border-4 transition active:scale-95 disabled:opacity-30 ${
+                recording ? 'border-red-400/70' : 'border-white/85'}`}>
+              <span className={`transition-all ${recording
+                ? 'h-8 w-8 rounded-lg bg-red-500'
+                : 'h-[62px] w-[62px] rounded-full bg-red-500'}`} />
+            </button>
+          )}
+
+          <button type="button" aria-label="Alternar câmera" onClick={flipCamera} disabled={recording || cameraError}
+            className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/20 bg-black/35 text-white/70 backdrop-blur-sm transition hover:bg-white/[0.08] hover:text-white disabled:opacity-30">
+            <SwitchCamera size={21} strokeWidth={1.7} />
+          </button>
+        </div>
       </div>
     </div>
   );

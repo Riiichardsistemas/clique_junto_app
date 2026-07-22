@@ -7,10 +7,13 @@ import Brand from '../components/ui/Brand.jsx';
 import LogoMark from '../components/ui/LogoMark.jsx';
 
 /*
- * Tela de login em dois painéis, fiel ao mockup:
+ * Tela de autenticação em dois painéis, fiel ao mockup:
  * - Painel esquerdo: foto do evento desfocada + marca + tagline em serif.
  * - Painel direito: formulário com ícones e botão dourado.
  * - Polaroids decorativos flutuando ao redor do cartão.
+ *
+ * O layout (AuthSplit) e os campos são compartilhados por Login e Register,
+ * garantindo identidade visual idêntica entre as duas telas.
  *
  * Imagens (opcionais — há fallback em gradiente se não existirem):
  *   frontend/public/login-hero.webp → foto dos noivos (painel esquerdo e polaroid inferior)
@@ -33,35 +36,8 @@ function Polaroid({ src, className = '', rotate = 0, size = 'h-[72px] w-[72px]',
   );
 }
 
-export default function Login() {
-  const { login } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const from = location.state?.from?.pathname || '/dashboard';
-
-  const [form, setForm] = useState({ email: '', password: '' });
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-
-  const onChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
-
-  const onSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const user = await login(form);
-      toast.success('Bem-vindo de volta!');
-      const target = user?.role === 'admin'
-        ? (from.startsWith('/admin') ? from : '/admin')
-        : (from.startsWith('/admin') ? '/dashboard' : from);
-      navigate(target, { replace: true });
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Não foi possível entrar.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+/* ===== Layout compartilhado — dois painéis + decoração ===== */
+export function AuthSplit({ title, subtitle, children }) {
   return (
     <div
       className="relative flex h-[100dvh] justify-center overflow-y-auto overflow-x-hidden px-4 sm:px-6 lg:px-16"
@@ -157,79 +133,9 @@ export default function Login() {
           <div className="relative bg-[#141416]/82 px-6 py-7 backdrop-blur-2xl sm:px-10 sm:py-10 md:bg-[#151517]/95 md:backdrop-blur-none">
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.05] to-transparent md:from-white/[0.03]" />
             <div className="relative mx-auto w-full max-w-[380px]">
-              <h1 className="font-serif text-[30px] font-semibold leading-none tracking-tight sm:text-[40px]">Entrar</h1>
-              <p className="mb-6 mt-2 text-[15px] leading-relaxed text-cream/70">Acesse o painel dos seus eventos</p>
-
-              <form onSubmit={onSubmit} className="space-y-4">
-                <div>
-                  <label htmlFor="email" className="mb-2 block text-sm font-medium text-cream/85">Email</label>
-                  <div className="relative">
-                    <Mail aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-cream/55" />
-                    <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      placeholder="voce@email.com"
-                      value={form.email}
-                      onChange={onChange}
-                      required
-                      autoComplete="email"
-                      className="input-field pl-11"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="password" className="mb-2 block text-sm font-medium text-cream/85">Senha</label>
-                  <div className="relative">
-                    <KeyRound aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-cream/55" />
-                    <input
-                      id="password"
-                      name="password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="digite sua senha"
-                      value={form.password}
-                      onChange={onChange}
-                      required
-                      autoComplete="current-password"
-                      className="input-field pl-11 pr-12"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((v) => !v)}
-                      aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                      className="absolute right-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-cream/60 transition hover:text-cream"
-                    >
-                      {showPassword ? <Eye className="h-[18px] w-[18px]" /> : <EyeOff className="h-[18px] w-[18px]" />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Botão dourado metálico */}
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="mt-1 inline-flex min-h-[48px] w-full items-center justify-center rounded-full text-[15px] font-bold text-[#231a0d] transition-all duration-250 hover:brightness-105 active:scale-[0.985] disabled:opacity-60"
-                  style={{
-                    background: 'linear-gradient(100deg, #a97f47 0%, #e6cd9d 26%, #f6e9c8 50%, #d2ad78 74%, #9d7440 100%)',
-                    boxShadow: '0 0 26px rgba(210,173,120,.32), 0 10px 28px -12px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.55)',
-                  }}
-                >
-                  {loading ? 'Entrando…' : 'Entrar'}
-                </button>
-              </form>
-
-              <p className="mt-6 text-center text-sm">
-                <Link to="/forgot-password" className="inline-flex min-h-10 items-center font-medium text-cream/75 transition hover:text-cream">
-                  Esqueci minha senha
-                </Link>
-              </p>
-              <p className="text-center text-sm text-cream/70">
-                Não tem conta?{' '}
-                <Link to="/register" className="inline-flex min-h-10 items-center font-medium text-gold underline-offset-4 hover:underline">
-                  Criar agora
-                </Link>
-              </p>
+              <h1 className="font-serif text-[30px] font-semibold leading-none tracking-tight sm:text-[40px]">{title}</h1>
+              <p className="mb-6 mt-2 text-[15px] leading-relaxed text-cream/70">{subtitle}</p>
+              {children}
             </div>
           </div>
         </div>
@@ -238,7 +144,128 @@ export default function Login() {
   );
 }
 
-/* Mantido para Register, ForgotPassword e ResetPassword */
+/* ===== Campos compartilhados — mesmo visual nas duas telas ===== */
+export function AuthField({ id, label, icon: Icon, ...props }) {
+  return (
+    <div>
+      <label htmlFor={id} className="mb-2 block text-sm font-medium text-cream/85">{label}</label>
+      <div className="relative">
+        <Icon aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-cream/55" />
+        <input id={id} className="input-field pl-11" {...props} />
+      </div>
+    </div>
+  );
+}
+
+export function AuthPasswordField({ id, label = 'Senha', ...props }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div>
+      <label htmlFor={id} className="mb-2 block text-sm font-medium text-cream/85">{label}</label>
+      <div className="relative">
+        <KeyRound aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-cream/55" />
+        <input id={id} type={show ? 'text' : 'password'} className="input-field pl-11 pr-12" {...props} />
+        <button
+          type="button"
+          onClick={() => setShow((v) => !v)}
+          aria-label={show ? 'Ocultar senha' : 'Mostrar senha'}
+          className="absolute right-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-cream/60 transition hover:text-cream"
+        >
+          {show ? <Eye className="h-[18px] w-[18px]" /> : <EyeOff className="h-[18px] w-[18px]" />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* Botão dourado metálico */
+export function GoldButton({ loading, loadingLabel = 'Aguarde…', children }) {
+  return (
+    <button
+      type="submit"
+      disabled={loading}
+      className="mt-1 inline-flex min-h-[48px] w-full items-center justify-center rounded-full text-[15px] font-bold text-[#231a0d] transition-all duration-250 hover:brightness-105 active:scale-[0.985] disabled:opacity-60"
+      style={{
+        background: 'linear-gradient(100deg, #a97f47 0%, #e6cd9d 26%, #f6e9c8 50%, #d2ad78 74%, #9d7440 100%)',
+        boxShadow: '0 0 26px rgba(210,173,120,.32), 0 10px 28px -12px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.55)',
+      }}
+    >
+      {loading ? loadingLabel : children}
+    </button>
+  );
+}
+
+export default function Login() {
+  const { login } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from?.pathname || '/dashboard';
+
+  const [form, setForm] = useState({ email: '', password: '' });
+  const [loading, setLoading] = useState(false);
+
+  const onChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const user = await login(form);
+      toast.success('Bem-vindo de volta!');
+      const target = user?.role === 'admin'
+        ? (from.startsWith('/admin') ? from : '/admin')
+        : (from.startsWith('/admin') ? '/dashboard' : from);
+      navigate(target, { replace: true });
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Não foi possível entrar.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <AuthSplit title="Entrar" subtitle="Acesse o painel dos seus eventos">
+      <form onSubmit={onSubmit} className="space-y-4">
+        <AuthField
+          id="email"
+          name="email"
+          type="email"
+          label="Email"
+          icon={Mail}
+          placeholder="voce@email.com"
+          value={form.email}
+          onChange={onChange}
+          required
+          autoComplete="email"
+        />
+        <AuthPasswordField
+          id="password"
+          name="password"
+          placeholder="digite sua senha"
+          value={form.password}
+          onChange={onChange}
+          required
+          autoComplete="current-password"
+        />
+        <GoldButton loading={loading} loadingLabel="Entrando…">Entrar</GoldButton>
+      </form>
+
+      <p className="mt-6 text-center text-sm">
+        <Link to="/forgot-password" className="inline-flex min-h-10 items-center font-medium text-cream/75 transition hover:text-cream">
+          Esqueci minha senha
+        </Link>
+      </p>
+      <p className="text-center text-sm text-cream/70">
+        Não tem conta?{' '}
+        <Link to="/register" className="inline-flex min-h-10 items-center font-medium text-gold underline-offset-4 hover:underline">
+          Criar agora
+        </Link>
+      </p>
+    </AuthSplit>
+  );
+}
+
+/* Mantido para ForgotPassword e ResetPassword */
 export function AuthShell({ title, subtitle, children }) {
   return (
     <div className="app-screen relative flex items-start justify-center overflow-x-hidden px-4 py-6 sm:items-center sm:px-6 sm:py-12">

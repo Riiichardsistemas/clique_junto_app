@@ -163,10 +163,10 @@ function ConviteEntry({
             />
 
             <label htmlFor="invite-email" className="mb-2 mt-4 block font-mono text-[10px] font-semibold uppercase tracking-[0.25em]" style={{ color: `${ink}80` }}>
-              Email <span className="normal-case tracking-normal" style={{ color: `${ink}59` }}>(opcional, para avisar da revelação)</span>
+              Email <span className="normal-case tracking-normal" style={{ color: `${ink}59` }}>(reconhece você se voltar e avisa da revelação)</span>
             </label>
             <input
-              id="invite-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email"
+              id="invite-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required
               placeholder="voce@email.com"
               className="w-full rounded-xl border bg-white/70 px-4 py-3.5 text-base outline-none transition placeholder:text-[#2b241a]/35 focus:bg-white sm:text-[15px]"
               style={{ borderColor: `${ink}26`, color: ink }}
@@ -259,10 +259,14 @@ export default function GuestEntry() {
     e.preventDefault();
     const name = nickname.trim();
     if (!name) { setError('Digite seu nome para continuar.'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError('Informe um email válido — é ele que guarda suas fotos se você voltar.');
+      return;
+    }
     setJoining(true);
     setError('');
     try {
-      const data = await guestApi.join(slug, name, email.trim() || undefined);
+      const data = await guestApi.join(slug, name, email.trim());
       guestApi.setGuestToken(slug, data.token);
       navigate(`/e/${slug}/camera`);
     } catch (err) {
@@ -385,11 +389,10 @@ export default function GuestEntry() {
               </div>
 
               <div>
-                <label htmlFor="guest-email" className="mb-1.5 block text-sm font-medium text-cream-dim">
-                  Email <span className="font-normal text-cream-dim/60">(opcional)</span>
-                </label>
-                <input id="guest-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email"
-                  placeholder="para ser avisado quando o álbum revelar" className="input-field" />
+                <label htmlFor="guest-email" className="mb-1.5 block text-sm font-medium text-cream-dim">Email</label>
+                <input id="guest-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required
+                  placeholder="voce@email.com" className="input-field" />
+                <p className="mt-1.5 text-xs text-cream-dim/70">Para reconhecer você se voltar e avisar quando o álbum revelar.</p>
               </div>
 
               {error && (

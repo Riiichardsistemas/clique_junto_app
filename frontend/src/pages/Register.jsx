@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { Mail, UserRound } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.jsx';
-import Input from '../components/ui/Input';
-import Button from '../components/ui/Button';
-import { AuthShell } from './Login';
+import { AuthSplit, AuthField, AuthPasswordField, GoldButton } from './Login';
 
+/*
+ * Cadastro com a mesma identidade visual do Login:
+ * usa o layout AuthSplit e os campos compartilhados exportados por Login.jsx.
+ */
 export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -34,50 +37,50 @@ export default function Register() {
   };
 
   return (
-    <AuthShell title="Criar conta" subtitle="Comece a guardar memórias dos seus eventos.">
+    <AuthSplit title="Criar conta" subtitle="Comece a guardar memórias dos seus eventos">
       <form onSubmit={onSubmit} className="space-y-4">
-        <Input
+        <AuthField
           id="name"
           name="name"
+          type="text"
           label="Nome"
+          icon={UserRound}
           placeholder="Seu nome"
           value={form.name}
           onChange={onChange}
           required
           autoComplete="name"
         />
-        <Input
+        <AuthField
           id="email"
           name="email"
           type="email"
           label="Email"
+          icon={Mail}
           placeholder="voce@email.com"
           value={form.email}
           onChange={onChange}
           required
           autoComplete="email"
         />
-        <Input
+        <AuthPasswordField
           id="password"
           name="password"
-          type="password"
-          label="Senha"
-          placeholder="Mínimo 6 caracteres"
+          placeholder="mínimo 6 caracteres"
           value={form.password}
           onChange={onChange}
           required
           autoComplete="new-password"
         />
-        <Button type="submit" loading={loading} className="w-full">
-          Criar conta grátis
-        </Button>
+        <GoldButton loading={loading} loadingLabel="Criando conta…">Criar conta grátis</GoldButton>
       </form>
-      <p className="mt-6 text-center text-sm text-cream/55">
+
+      <p className="mt-6 text-center text-sm text-cream/70">
         Já tem conta?{' '}
-        <Link to="/login" className="inline-flex min-h-11 min-w-11 items-center justify-center text-gold hover:underline">
+        <Link to="/login" className="inline-flex min-h-10 items-center font-medium text-gold underline-offset-4 hover:underline">
           Entrar
         </Link>
       </p>
-    </AuthShell>
+    </AuthSplit>
   );
 }
