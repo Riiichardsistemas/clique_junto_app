@@ -1,17 +1,18 @@
 import { NavLink } from 'react-router-dom';
-import { CalendarRange, Images, Plus, UserRound } from 'lucide-react';
+import { CalendarRange, Images, Plus, UserRound, Gift } from 'lucide-react';
 
 const ITEMS = [
   { to: '/dashboard', label: 'Eventos', icon: CalendarRange, end: true },
-  { to: '/events/new', label: 'Criar', icon: Plus, primary: true },
   { to: '/albuns', label: 'Álbuns', icon: Images },
+  { to: '/events/new', label: 'Criar', icon: Plus, primary: true },
+  { to: '/afiliados', label: 'Ganhe', icon: Gift },
   { to: '/account', label: 'Conta', icon: UserRound },
 ];
 
 export default function MobileBottomNav() {
   return (
     <nav className="mobile-tabbar" aria-label="Navegação principal móvel">
-      <div className="mx-auto grid max-w-md grid-cols-4 gap-1">
+      <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
         {ITEMS.map(({ to, label, icon: Icon, end, primary }) => (
           <NavLink
             key={to}

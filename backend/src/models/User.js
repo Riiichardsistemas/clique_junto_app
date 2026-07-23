@@ -81,6 +81,17 @@ module.exports = (sequelize) => {
         allowNull: false,
         defaultValue: 0,
       },
+      // Codigo unico de indicacao do afiliado. Base do link /register?ref=CODE.
+      referralCode: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        unique: true,
+      },
+      // Afiliado que indicou este usuario (quem ganha comissao pelas compras dele).
+      referredByUserId: {
+        type: DataTypes.UUID,
+        allowNull: true,
+      },
     },
     {
       tableName: 'users',

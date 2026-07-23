@@ -3,6 +3,18 @@ export const ACTION_LABELS = {
   'event.closed': 'Evento encerrado',
   'event.revealed': 'Álbum revelado',
   'event.deleted': 'Evento excluído',
+  'event.updated': 'Evento editado',
+  'event.branding_updated': 'Capa/logo alterada',
+  'ip.blocked': 'IP bloqueado',
+  'ip.unblocked': 'IP desbloqueado',
+  'commission.updated': 'Comissão atualizada',
+};
+
+export const ACCESS_TYPE_LABELS = {
+  login_success: 'Login',
+  login_failed: 'Falha de login',
+  logout: 'Logout',
+  password_reset: 'Redefinição de senha',
 };
 
 export function formatDateTime(value) {

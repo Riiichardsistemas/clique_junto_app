@@ -261,6 +261,11 @@ export default function Login() {
           Criar agora
         </Link>
       </p>
+      <p className="mt-4 text-center text-xs text-cream/45">
+        <Link to="/privacidade" className="underline-offset-4 transition hover:text-cream/70 hover:underline">
+          Política de Privacidade
+        </Link>
+      </p>
     </AuthSplit>
   );
 }

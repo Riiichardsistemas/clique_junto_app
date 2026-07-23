@@ -1,5 +1,5 @@
 import { Link, NavLink } from 'react-router-dom';
-import { Images, CalendarRange, Settings, LogOut, Crown } from 'lucide-react';
+import { Images, CalendarRange, Settings, LogOut, Crown, Gift } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import Brand from '../ui/Brand.jsx';
 import MobileBottomNav from './MobileBottomNav.jsx';
@@ -33,6 +33,10 @@ export default function AppHeader() {
             <NavLink to="/albuns" className={navItem} aria-label="Álbuns">
               <Images size={15} aria-hidden="true" />
               <span>Álbuns</span>
+            </NavLink>
+            <NavLink to="/afiliados" className={navItem} aria-label="Indique e ganhe">
+              <Gift size={15} aria-hidden="true" />
+              <span>Indique e ganhe</span>
             </NavLink>
             {user?.role === 'admin' && (
               <NavLink to="/admin" className={navItem} aria-label="Administração">

@@ -77,4 +77,27 @@ const forgotPassword = (name, resetUrl) => ({
     <p style="color:#777;font-size:13px;margin-top:16px">Se não foi você, pode ignorar este email — sua senha continua a mesma.</p>`),
 });
 
-module.exports = { welcome, paymentConfirmed, eventRevealed, reminder24h, recapReady, guestAlbumReady, forgotPassword };
+// Notificação interna ao super admin quando um novo usuário se cadastra.
+const newSignupAdmin = (user, adminUrl) => {
+  const row = (label, value) =>
+    `<tr>
+      <td style="padding:8px 0;color:#888;font-size:13px;width:110px">${esc(label)}</td>
+      <td style="padding:8px 0;color:#fff;font-size:14px;font-weight:bold">${esc(value)}</td>
+    </tr>`;
+  const when = new Date(user.createdAt || Date.now()).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  return {
+    subject: `Novo cadastro: ${esc(user.name)}`,
+    html: wrap(`<h2 style="font-family:Georgia,serif;margin-top:0">Novo cadastro na plataforma</h2>
+      <p style="color:#cfcfcf">Um novo usuário acabou de criar uma conta:</p>
+      <table style="width:100%;border-collapse:collapse;margin-top:8px">
+        ${row('Nome', user.name)}
+        ${row('Email', user.email)}
+        ${row('Tipo', user.role === 'admin' ? 'Administrador' : 'Organizador')}
+        ${row('Origem', user.provider === 'google' ? 'Google' : 'Email e senha')}
+        ${row('Data', when)}
+      </table>
+      ${adminUrl ? `<p style="margin-top:20px">${btn(adminUrl, 'Ver no painel')}</p>` : ''}`),
+  };
+};
+
+module.exports = { welcome, paymentConfirmed, eventRevealed, reminder24h, recapReady, guestAlbumReady, forgotPassword, newSignupAdmin };

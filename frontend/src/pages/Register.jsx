@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Mail, UserRound } from 'lucide-react';
+import { Mail, UserRound, Gift } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { AuthSplit, AuthField, AuthPasswordField, GoldButton } from './Login';
 
@@ -12,6 +12,8 @@ import { AuthSplit, AuthField, AuthPasswordField, GoldButton } from './Login';
 export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const ref = (searchParams.get('ref') || '').trim();
 
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
@@ -26,7 +28,7 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      const user = await register(form);
+      const user = await register(ref ? { ...form, ref } : form);
       toast.success('Conta criada com sucesso!');
       navigate(user?.role === 'admin' ? '/admin' : '/dashboard', { replace: true });
     } catch (err) {
@@ -38,6 +40,14 @@ export default function Register() {
 
   return (
     <AuthSplit title="Criar conta" subtitle="Comece a guardar memórias dos seus eventos">
+      {ref && (
+        <div className="mb-5 flex items-center gap-3 rounded-xl border border-gold/25 bg-gold/[0.06] px-4 py-3">
+          <Gift size={18} className="shrink-0 text-gold" />
+          <p className="text-sm text-cream">
+            Você foi <span className="font-semibold text-gold-light">indicado por um amigo</span>. Bem-vindo!
+          </p>
+        </div>
+      )}
       <form onSubmit={onSubmit} className="space-y-4">
         <AuthField
           id="name"

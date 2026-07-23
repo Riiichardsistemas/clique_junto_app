@@ -1,11 +1,13 @@
 const { Op, fn, col } = require('sequelize');
-const { User, Event, Guest, Photo, Plan, AdminAuditLog, sequelize } = require('../models');
+const { User, Event, Guest, Photo, Plan, AdminAuditLog, AccessLog, BlockedIp, Commission, sequelize } = require('../models');
 const { getPlan, formatBRL } = require('../config/plans');
+const { DEFAULT_RATE_BPS, formatRate } = require('../config/affiliate');
 const { EVENT_STATUS } = require('../config/constants');
 const storage = require('../config/storage');
 const { sendMail } = require('../config/mailer');
 const templates = require('../utils/emailTemplates');
 const { recordAdminAction } = require('../services/adminAuditService');
+const { refreshBlockedIps } = require('../middlewares/ipBlockMiddleware');
 
 function pagination(query, defaultLimit = 25) {
   const limit = Math.min(Math.max(Number(query.limit) || defaultLimit, 1), 100);
@@ -47,6 +49,10 @@ async function serializeEvent(event) {
     isPrivate: event.isPrivate,
     liveWallEnabled: event.liveWallEnabled,
     recapStatus: event.recapStatus,
+    coverImageUrl: event.coverImageUrl,
+    logoUrl: event.logoUrl,
+    welcomeMessage: event.welcomeMessage,
+    venueName: event.venueName,
     organizer: organizerSummary(event.organizer),
     ...(await eventUsage(event.id)),
   };
@@ -703,18 +709,477 @@ async function systemStatus(req, res, next) {
   }
 }
 
+// GET /api/admin/payments/:id — detalhe completo de uma cobrança
+async function getPayment(req, res, next) {
+  try {
+    const payment = await Plan.findByPk(req.params.id, {
+      include: [{
+        model: Event,
+        as: 'event',
+        attributes: ['id', 'name', 'slug', 'status'],
+        include: [{ model: User, as: 'organizer', attributes: ['id', 'name', 'email', 'cpfCnpj'] }],
+      }],
+    });
+    if (!payment) return res.status(404).json({ error: 'Cobrança não encontrada.' });
+
+    const organizer = payment.event?.organizer;
+    return res.json({
+      payment: {
+        id: payment.id,
+        providerPaymentId: payment.providerPaymentId,
+        planId: payment.planId,
+        planLabel: getPlan(payment.planId)?.label || payment.planId,
+        amountCents: payment.amountCents,
+        amount: formatBRL(payment.amountCents),
+        provider: payment.provider,
+        status: payment.status,
+        billingType: payment.billingType,
+        invoiceUrl: payment.invoiceUrl,
+        createdAt: payment.createdAt,
+        paidAt: payment.paidAt,
+        event: payment.event
+          ? { id: payment.event.id, name: payment.event.name, slug: payment.event.slug, status: payment.event.status }
+          : null,
+        organizer: organizer
+          ? { id: organizer.id, name: organizer.name, email: organizer.email, cpfCnpj: organizer.cpfCnpj || null }
+          : null,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+// PATCH /api/admin/events/:id — edita campos do evento em nome do organizador
+async function updateEvent(req, res, next) {
+  try {
+    const event = await loadAdminEvent(req, res);
+    if (!event) return undefined;
+
+    const EDITABLE = ['name', 'startsAt', 'endsAt', 'revealAt', 'welcomeMessage', 'venueName'];
+    const changes = {};
+    for (const field of EDITABLE) {
+      if (req.body[field] === undefined) continue;
+      let value = req.body[field];
+      if (['startsAt', 'endsAt', 'revealAt'].includes(field)) {
+        value = value ? new Date(value) : null;
+      } else if (typeof value === 'string') {
+        value = value.trim();
+      }
+      const before = event[field];
+      const beforeCmp = before instanceof Date ? before.toISOString() : before;
+      const afterCmp = value instanceof Date ? value.toISOString() : value;
+      if (String(beforeCmp ?? '') !== String(afterCmp ?? '')) {
+        changes[field] = { from: beforeCmp ?? null, to: afterCmp ?? null };
+        event[field] = value;
+      }
+    }
+
+    if (req.body.name !== undefined && !String(event.name || '').trim()) {
+      return res.status(400).json({ error: 'O nome do evento não pode ficar vazio.' });
+    }
+
+    if (Object.keys(changes).length) {
+      await event.save();
+      await recordAdminAction(req, {
+        action: 'event.updated',
+        targetType: 'event',
+        targetId: event.id,
+        targetLabel: event.name,
+        metadata: { changes },
+      });
+    }
+
+    return res.json({ event: await serializeEvent(event) });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+// POST /api/admin/events/:id/branding-image?slot=cover|logo
+async function uploadEventBranding(req, res, next) {
+  try {
+    const event = await loadAdminEvent(req, res);
+    if (!event) return undefined;
+
+    const file = req.file;
+    if (!file || !file.buffer || !file.buffer.length) {
+      return res.status(400).json({ error: 'Nenhuma imagem enviada.' });
+    }
+    const SLOT_FIELD = { cover: 'coverImageUrl', logo: 'logoUrl' };
+    const slot = SLOT_FIELD[req.query.slot] ? req.query.slot : 'cover';
+
+    const { url } = await storage.saveObject({
+      eventId: event.id,
+      fileName: `${slot}-${file.originalname || 'img.jpg'}`,
+      buffer: file.buffer,
+      contentType: file.mimetype || 'image/jpeg',
+      appUrl: process.env.APP_URL,
+    });
+
+    event[SLOT_FIELD[slot]] = url;
+    await event.save();
+
+    await recordAdminAction(req, {
+      action: 'event.branding_updated',
+      targetType: 'event',
+      targetId: event.id,
+      targetLabel: event.name,
+      metadata: { slot },
+    });
+
+    return res.json({ ok: true, slot, url, event: await serializeEvent(event) });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+// GET /api/admin/access-logs — logins, falhas e logouts
+async function listAccessLogs(req, res, next) {
+  try {
+    const search = String(req.query.search || '').trim();
+    const type = String(req.query.type || '').trim();
+    const { limit, offset } = pagination(req.query);
+    const where = {};
+    if (['login_success', 'login_failed', 'logout', 'password_reset'].includes(type)) where.type = type;
+    if (search) {
+      where[Op.or] = [
+        { email: { [Op.like]: `%${search}%` } },
+        { ip: { [Op.like]: `%${search}%` } },
+        { '$user.name$': { [Op.like]: `%${search}%` } },
+      ];
+    }
+    const { rows, count } = await AccessLog.findAndCountAll({
+      where,
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset,
+      distinct: true,
+      subQuery: false,
+      include: [{ model: User, as: 'user', attributes: ['id', 'name', 'email'] }],
+    });
+    const { getBlockedSet } = require('../middlewares/ipBlockMiddleware');
+    const blocked = getBlockedSet();
+    return res.json({
+      total: count,
+      limit,
+      offset,
+      logs: rows.map((item) => ({
+        id: item.id,
+        type: item.type,
+        reason: item.reason,
+        email: item.email,
+        ip: item.ip,
+        ipBlocked: item.ip ? blocked.has(String(item.ip).trim()) : false,
+        userAgent: item.userAgent,
+        createdAt: item.createdAt,
+        user: organizerSummary(item.user),
+      })),
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+// GET /api/admin/blocked-ips
+async function listBlockedIps(req, res, next) {
+  try {
+    const rows = await BlockedIp.findAll({
+      order: [['createdAt', 'DESC']],
+      include: [{ model: User, as: 'createdBy', attributes: ['id', 'name', 'email'] }],
+    });
+    return res.json({
+      blockedIps: rows.map((row) => ({
+        id: row.id,
+        ip: row.ip,
+        reason: row.reason,
+        createdAt: row.createdAt,
+        createdBy: organizerSummary(row.createdBy),
+      })),
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+// POST /api/admin/blocked-ips  { ip, reason? }
+async function blockIp(req, res, next) {
+  try {
+    const ip = String(req.body.ip || '').trim();
+    const reason = String(req.body.reason || '').trim() || null;
+    if (!ip) return res.status(400).json({ error: 'Informe um endereço IP.' });
+    if (ip.length > 64) return res.status(400).json({ error: 'Endereço IP inválido.' });
+
+    // Impede que o admin bloqueie o próprio IP e se tranque para fora
+    const selfIp = req.ip || req.socket?.remoteAddress || '';
+    if (ip === String(selfIp).trim()) {
+      return res.status(400).json({ error: 'Você não pode bloquear o seu próprio endereço IP atual.' });
+    }
+
+    const [row, created] = await BlockedIp.findOrCreate({
+      where: { ip },
+      defaults: { ip, reason, createdByUserId: req.user.id },
+    });
+    if (!created && reason && row.reason !== reason) {
+      row.reason = reason;
+      await row.save();
+    }
+
+    await refreshBlockedIps();
+    await recordAdminAction(req, {
+      action: 'ip.blocked',
+      targetType: 'ip',
+      targetId: ip,
+      targetLabel: ip,
+      metadata: { reason: reason || '—' },
+    });
+
+    return res.status(created ? 201 : 200).json({ ok: true, blockedIp: { id: row.id, ip: row.ip, reason: row.reason, createdAt: row.createdAt } });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+// DELETE /api/admin/blocked-ips/:id
+async function unblockIp(req, res, next) {
+  try {
+    const row = await BlockedIp.findByPk(req.params.id);
+    if (!row) return res.status(404).json({ error: 'Bloqueio não encontrado.' });
+    const ip = row.ip;
+    await row.destroy();
+    await refreshBlockedIps();
+    await recordAdminAction(req, {
+      action: 'ip.unblocked',
+      targetType: 'ip',
+      targetId: ip,
+      targetLabel: ip,
+      metadata: {},
+    });
+    return res.json({ ok: true });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Afiliados / Comissoes
+// ---------------------------------------------------------------------------
+
+// GET /api/admin/commissions — lista comissoes com filtros + totais globais.
+async function listCommissions(req, res, next) {
+  try {
+    const search = String(req.query.search || '').trim();
+    const status = String(req.query.status || '').trim();
+    const { limit, offset } = pagination(req.query);
+    const where = {};
+    if (['pending', 'paid', 'canceled'].includes(status)) where.status = status;
+    if (search) {
+      where[Op.or] = [
+        { '$affiliate.name$': { [Op.like]: `%${search}%` } },
+        { '$affiliate.email$': { [Op.like]: `%${search}%` } },
+        { '$referred.name$': { [Op.like]: `%${search}%` } },
+        { '$referred.email$': { [Op.like]: `%${search}%` } },
+      ];
+    }
+
+    const { rows, count } = await Commission.findAndCountAll({
+      where,
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset,
+      distinct: true,
+      subQuery: false,
+      include: [
+        { model: User, as: 'affiliate', attributes: ['id', 'name', 'email'] },
+        { model: User, as: 'referred', attributes: ['id', 'name', 'email'] },
+        { model: Event, as: 'event', attributes: ['id', 'name'] },
+      ],
+    });
+
+    // Totais globais (todas as comissoes, nao so a pagina) por status.
+    const allRows = await Commission.findAll({ attributes: ['status', 'commissionCents'], raw: true });
+    const totals = allRows.reduce((acc, row) => {
+      const cents = row.commissionCents || 0;
+      acc[row.status] = (acc[row.status] || 0) + cents;
+      return acc;
+    }, {});
+    const pendingCents = totals.pending || 0;
+    const paidCents = totals.paid || 0;
+
+    res.json({
+      total: count,
+      limit,
+      offset,
+      rateLabel: formatRate(DEFAULT_RATE_BPS),
+      summary: {
+        pendingCents,
+        pending: formatBRL(pendingCents),
+        paidCents,
+        paid: formatBRL(paidCents),
+        commissionCount: allRows.length,
+      },
+      commissions: rows.map((c) => ({
+        id: c.id,
+        status: c.status,
+        saleAmountCents: c.saleAmountCents,
+        saleAmount: formatBRL(c.saleAmountCents),
+        commissionCents: c.commissionCents,
+        commission: formatBRL(c.commissionCents),
+        rateLabel: formatRate(c.rateBps),
+        note: c.note,
+        createdAt: c.createdAt,
+        paidAt: c.paidAt,
+        affiliate: organizerSummary(c.affiliate),
+        referred: organizerSummary(c.referred),
+        eventName: c.event?.name || '—',
+        eventId: c.event?.id || null,
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// PATCH /api/admin/commissions/:id — muda status (paid | pending | canceled) + nota.
+async function updateCommission(req, res, next) {
+  try {
+    const commission = await Commission.findByPk(req.params.id, {
+      include: [{ model: User, as: 'affiliate', attributes: ['id', 'name', 'email'] }],
+    });
+    if (!commission) return res.status(404).json({ error: 'Comissao nao encontrada.' });
+
+    const nextStatus = req.body.status;
+    if (nextStatus !== undefined && !['pending', 'paid', 'canceled'].includes(nextStatus)) {
+      return res.status(400).json({ error: 'Status de comissao invalido.' });
+    }
+
+    const previousStatus = commission.status;
+    if (nextStatus && nextStatus !== previousStatus) {
+      commission.status = nextStatus;
+      commission.paidAt = nextStatus === 'paid' ? new Date() : null;
+    }
+    if (req.body.note !== undefined) {
+      commission.note = req.body.note ? String(req.body.note).slice(0, 200) : null;
+    }
+    await commission.save();
+
+    await recordAdminAction(req, {
+      action: 'commission.updated',
+      targetType: 'commission',
+      targetId: commission.id,
+      targetLabel: commission.affiliate ? `${commission.affiliate.name} (${commission.affiliate.email})` : commission.id,
+      metadata: {
+        status: { from: previousStatus, to: commission.status },
+        commissionCents: commission.commissionCents,
+      },
+    });
+
+    return res.json({
+      commission: {
+        id: commission.id,
+        status: commission.status,
+        commissionCents: commission.commissionCents,
+        commission: formatBRL(commission.commissionCents),
+        note: commission.note,
+        paidAt: commission.paidAt,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+// GET /api/admin/affiliates — ranking de afiliados por ganhos/indicacoes.
+async function listAffiliates(req, res, next) {
+  try {
+    const search = String(req.query.search || '').trim();
+    const { limit, offset } = pagination(req.query);
+
+    // Considera afiliado quem ja tem ao menos uma indicacao OU comissao.
+    const referrerIdRows = await User.findAll({
+      attributes: [[fn('DISTINCT', col('referredByUserId')), 'id']],
+      where: { referredByUserId: { [Op.ne]: null } },
+      raw: true,
+    });
+    const commissionAffiliateRows = await Commission.findAll({
+      attributes: [[fn('DISTINCT', col('affiliateUserId')), 'id']],
+      raw: true,
+    });
+    const affiliateIds = [...new Set([
+      ...referrerIdRows.map((r) => r.id),
+      ...commissionAffiliateRows.map((r) => r.id),
+    ].filter(Boolean))];
+
+    if (!affiliateIds.length) {
+      return res.json({ total: 0, limit, offset, affiliates: [] });
+    }
+
+    const where = { id: { [Op.in]: affiliateIds } };
+    if (search) {
+      where[Op.and] = [{ [Op.or]: [
+        { name: { [Op.like]: `%${search}%` } },
+        { email: { [Op.like]: `%${search}%` } },
+        { referralCode: { [Op.like]: `%${search}%` } },
+      ] }];
+    }
+
+    const users = await User.findAll({ where });
+
+    const enriched = await Promise.all(users.map(async (user) => {
+      const [referralCount, commissions] = await Promise.all([
+        User.count({ where: { referredByUserId: user.id } }),
+        Commission.findAll({ where: { affiliateUserId: user.id }, attributes: ['status', 'commissionCents'], raw: true }),
+      ]);
+      const pendingCents = commissions.filter((c) => c.status === 'pending').reduce((s, c) => s + (c.commissionCents || 0), 0);
+      const paidCents = commissions.filter((c) => c.status === 'paid').reduce((s, c) => s + (c.commissionCents || 0), 0);
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        referralCode: user.referralCode,
+        isActive: user.isActive,
+        referralCount,
+        salesCount: commissions.filter((c) => c.status !== 'canceled').length,
+        pendingCents,
+        pending: formatBRL(pendingCents),
+        paidCents,
+        paid: formatBRL(paidCents),
+        totalCents: pendingCents + paidCents,
+        total: formatBRL(pendingCents + paidCents),
+      };
+    }));
+
+    enriched.sort((a, b) => b.totalCents - a.totalCents || b.referralCount - a.referralCount);
+    const paged = enriched.slice(offset, offset + limit);
+
+    return res.json({ total: enriched.length, limit, offset, affiliates: paged });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   overview,
+  listCommissions,
+  updateCommission,
+  listAffiliates,
   listUsers,
   getUser,
   updateUser,
   grantCredit,
   listEvents,
   getEvent,
+  updateEvent,
+  uploadEventBranding,
   closeEvent,
   revealEvent,
   deleteEvent,
   listPayments,
+  getPayment,
   listAuditLogs,
+  listAccessLogs,
+  listBlockedIps,
+  blockIp,
+  unblockIp,
   systemStatus,
 };

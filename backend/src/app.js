@@ -80,6 +80,7 @@ const db = require('./models');
 const routes = require('./routes');
 const { notFound, errorHandler } = require('./middlewares/errorHandler');
 const { apiLimiter } = require('./middlewares/rateLimitMiddleware');
+const { ipBlockMiddleware, refreshBlockedIps } = require('./middlewares/ipBlockMiddleware');
 const { startRevealJob } = require('./jobs/revealJob');
 const storage = require('./config/storage');
 
@@ -156,6 +157,9 @@ if (!storage.useS3) {
 // Rate limit geral
 app.use('/api', apiLimiter);
 
+// Bloqueio de IP — recusa requisições de IPs marcados pelo super admin
+app.use('/api', ipBlockMiddleware);
+
 // Rotas da API
 app.use('/api', routes);
 
@@ -229,6 +233,17 @@ async function runStartupMigrations() {
     defaultValue: 0,
   });
 
+  // #9 — programa de afiliados: codigo de indicacao e quem indicou o usuario.
+  await ensureColumn('users', 'referralCode', {
+    type: DataTypes.STRING,
+    allowNull: true,
+    unique: true,
+  });
+  await ensureColumn('users', 'referredByUserId', {
+    type: DataTypes.UUID,
+    allowNull: true,
+  });
+
   // #7 — capacidade de memorias do album, conforme o plano (0 = ilimitado).
   // Eventos ja existentes recebem 0 (sem novo limite); novos eventos recebem a
   // capacidade do plano ao serem criados/pagos.
@@ -261,6 +276,9 @@ async function start() {
     console.log('[DB] Models sincronizados.');
 
     await runStartupMigrations();
+
+    // Carrega o cache de IPs bloqueados antes de aceitar tráfego
+    await refreshBlockedIps();
 
     startRevealJob();
 

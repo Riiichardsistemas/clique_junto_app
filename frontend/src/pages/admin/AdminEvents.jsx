@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   CalendarDays, ChevronRight, Clock3, ExternalLink, Eye, HardDrive, Image,
-  Loader2, Lock, Search, Trash2, UserRound, Users, XCircle,
+  ImagePlus, Loader2, Lock, Save, Search, Trash2, UserRound, Users, XCircle,
 } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import AdminDrawer from '../../components/admin/AdminDrawer';
@@ -157,7 +157,11 @@ export default function AdminEvents() {
         {detailLoading || !detail ? (
           <div className="flex min-h-64 items-center justify-center gap-3 text-sm text-cream-dim"><Loader2 className="animate-spin text-gold" /> Carregando evento…</div>
         ) : (
-          <EventDetail detail={detail} onAction={(type) => setConfirmation({ type, event: detail.event })} />
+          <EventDetail
+            detail={detail}
+            onAction={(type) => setConfirmation({ type, event: detail.event })}
+            onUpdated={() => { loadDetail(selectedId); load(); }}
+          />
         )}
       </AdminDrawer>
 
@@ -175,7 +179,115 @@ export default function AdminEvents() {
   );
 }
 
-function EventDetail({ detail, onAction }) {
+function toLocalInput(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function EventSupport({ event, onUpdated }) {
+  const [form, setForm] = useState({
+    name: event.name || '',
+    venueName: event.venueName || '',
+    welcomeMessage: event.welcomeMessage || '',
+    startsAt: toLocalInput(event.startsAt),
+    endsAt: toLocalInput(event.endsAt),
+    revealAt: toLocalInput(event.revealAt),
+  });
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState('');
+  const coverRef = useRef(null);
+  const logoRef = useRef(null);
+
+  const onChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+
+  async function save() {
+    if (!form.name.trim()) { toast.error('O nome não pode ficar vazio.'); return; }
+    setSaving(true);
+    try {
+      await adminApi.updateEvent(event.id, {
+        name: form.name.trim(),
+        venueName: form.venueName.trim(),
+        welcomeMessage: form.welcomeMessage.trim(),
+        startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null,
+        endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null,
+        revealAt: form.revealAt ? new Date(form.revealAt).toISOString() : null,
+      });
+      toast.success('Evento atualizado.');
+      onUpdated?.();
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Não foi possível salvar.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function uploadImage(slot, file) {
+    if (!file) return;
+    setUploading(slot);
+    try {
+      await adminApi.uploadEventBranding(event.id, slot, file);
+      toast.success(slot === 'cover' ? 'Capa atualizada.' : 'Logo atualizada.');
+      onUpdated?.();
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Não foi possível enviar a imagem.');
+    } finally {
+      setUploading('');
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-gold/15 bg-gold/[0.04] p-4">
+      <p className="mb-4 text-xs font-bold uppercase tracking-[0.15em] text-gold">Suporte ao organizador</p>
+
+      {/* Capa e logo */}
+      <div className="mb-4 grid grid-cols-2 gap-3">
+        <div>
+          <div className="relative aspect-video overflow-hidden rounded-xl border border-line bg-white/[0.03]">
+            {event.coverImageUrl
+              ? <img src={event.coverImageUrl} alt="Capa" className="h-full w-full object-cover" />
+              : <span className="flex h-full items-center justify-center text-[11px] text-cream-dim">Sem capa</span>}
+          </div>
+          <input ref={coverRef} type="file" accept="image/*" hidden onChange={(e) => uploadImage('cover', e.target.files?.[0])} />
+          <button type="button" className="btn-ghost btn-sm mt-2 w-full" disabled={uploading === 'cover'} onClick={() => coverRef.current?.click()}>
+            {uploading === 'cover' ? <Loader2 size={14} className="animate-spin" /> : <ImagePlus size={14} />} Trocar capa
+          </button>
+        </div>
+        <div>
+          <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-xl border border-line bg-white/[0.03]">
+            {event.logoUrl
+              ? <img src={event.logoUrl} alt="Logo" className="max-h-full max-w-full object-contain p-2" />
+              : <span className="text-[11px] text-cream-dim">Sem logo</span>}
+          </div>
+          <input ref={logoRef} type="file" accept="image/*" hidden onChange={(e) => uploadImage('logo', e.target.files?.[0])} />
+          <button type="button" className="btn-ghost btn-sm mt-2 w-full" disabled={uploading === 'logo'} onClick={() => logoRef.current?.click()}>
+            {uploading === 'logo' ? <Loader2 size={14} className="animate-spin" /> : <ImagePlus size={14} />} Trocar logo
+          </button>
+        </div>
+      </div>
+
+      {/* Campos editáveis */}
+      <div className="space-y-3">
+        <Field label="Nome do evento"><input name="name" value={form.name} onChange={onChange} className="input-field" /></Field>
+        <Field label="Local"><input name="venueName" value={form.venueName} onChange={onChange} className="input-field" placeholder="Opcional" /></Field>
+        <Field label="Mensagem de boas-vindas"><textarea name="welcomeMessage" value={form.welcomeMessage} onChange={onChange} rows={2} className="input-field resize-none" placeholder="Opcional" /></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Início"><input type="datetime-local" name="startsAt" value={form.startsAt} onChange={onChange} className="input-field" /></Field>
+          <Field label="Encerramento"><input type="datetime-local" name="endsAt" value={form.endsAt} onChange={onChange} className="input-field" /></Field>
+        </div>
+        <Field label="Revelação do álbum"><input type="datetime-local" name="revealAt" value={form.revealAt} onChange={onChange} className="input-field" /></Field>
+      </div>
+
+      <button type="button" className="btn-primary btn-sm mt-4 w-full" disabled={saving} onClick={save}>
+        {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Salvar alterações
+      </button>
+    </div>
+  );
+}
+
+function EventDetail({ detail, onAction, onUpdated }) {
   const { event, payments } = detail;
   return (
     <div className="space-y-6">
@@ -197,6 +309,8 @@ function EventDetail({ detail, onAction }) {
         <p className="text-sm font-semibold text-cream">{event.organizer?.name || 'Organizador indisponível'}</p>
         <p className="mt-1 text-xs text-cream-dim">{event.organizer?.email || '—'}</p>
       </div>
+
+      <EventSupport event={event} onUpdated={onUpdated} />
 
       <div className="rounded-2xl border border-line bg-white/[0.018] p-4 text-sm">
         <p className="mb-3 text-xs font-bold uppercase tracking-[0.15em] text-cream-dim/70">Configuração</p>
@@ -243,4 +357,13 @@ function Metric({ icon: Icon, value, label }) {
 
 function Info({ label, value }) {
   return <div className="flex items-center justify-between gap-4 border-t border-line/60 py-2.5 first:border-0"><span className="text-cream-dim">{label}</span><span className="text-right text-cream">{value}</span></div>;
+}
+
+function Field({ label, children }) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-medium text-cream/80">{label}</span>
+      {children}
+    </label>
+  );
 }

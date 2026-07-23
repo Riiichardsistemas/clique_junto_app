@@ -3,6 +3,30 @@ const { User } = require('../models');
 const { generateAuthToken } = require('../utils/generateToken');
 const { sendMail } = require('../config/mailer');
 const templates = require('../utils/emailTemplates');
+const { recordAccess } = require('../services/accessLogService');
+const { ensureReferralCode, resolveAffiliateByCode } = require('../services/affiliateService');
+
+/**
+ * Envia um email de notificação ao super admin quando alguém se cadastra.
+ * Destinatários controlados exclusivamente pela variável ADMIN_EMAIL
+ * (aceita múltiplos emails separados por vírgula).
+ * Nunca lança — o cadastro não deve falhar por causa do email.
+ */
+async function notifyAdminsOfSignup(user) {
+  try {
+    const recipients = String(process.env.ADMIN_EMAIL || '')
+      .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+    if (!recipients.length) return;
+
+    const base = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].trim().replace(/\/$/, '');
+    const adminUrl = `${base}/admin/usuarios`;
+    for (const to of recipients) {
+      sendMail({ to, ...templates.newSignupAdmin(user, adminUrl) }).catch(() => {});
+    }
+  } catch (err) {
+    console.error('[SIGNUP-NOTIFY] Falha ao notificar admins:', err.message);
+  }
+}
 
 /**
  * POST /api/auth/register
@@ -11,6 +35,8 @@ const templates = require('../utils/emailTemplates');
 async function register(req, res, next) {
   try {
     const { name, email, password } = req.body;
+    // Codigo de indicacao (link de afiliado). Aceita 'ref' ou 'referralCode'.
+    const refCode = req.body.ref || req.body.referralCode || null;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Nome, email e senha sao obrigatorios.' });
@@ -30,16 +56,31 @@ async function register(req, res, next) {
     const adminEmails = String(process.env.ADMIN_EMAIL || '')
       .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
     const role = adminEmails.includes(normalizedEmail) ? 'admin' : 'user';
+
+    // Resolve o afiliado que indicou (se veio um codigo valido no link).
+    let referredByUserId = null;
+    if (refCode) {
+      const affiliate = await resolveAffiliateByCode(refCode);
+      if (affiliate) referredByUserId = affiliate.id;
+    }
+
     const user = await User.create({
       name: String(name).trim(),
       email: normalizedEmail,
       passwordHash,
       provider: 'credentials',
       role,
+      referredByUserId,
     });
+
+    // Ja gera o proprio codigo de indicacao do novo usuario (nao bloqueia o cadastro).
+    ensureReferralCode(user).catch(() => {});
 
     // Email de boas-vindas (mock se nao houver SMTP)
     sendMail({ to: user.email, ...templates.welcome(user.name) }).catch(() => {});
+
+    // Notifica o super admin sobre o novo cadastro
+    notifyAdminsOfSignup(user).catch(() => {});
 
     const token = generateAuthToken(user);
     return res.status(201).json({ user: user.toJSON(), token });
@@ -64,18 +105,23 @@ async function login(req, res, next) {
     const user = await User.findOne({ where: { email: normalizedEmail } });
 
     // Mensagem generica para nao revelar se o email existe
-    const invalid = () => res.status(401).json({ error: 'Email ou senha incorretos.' });
+    const invalid = (reason) => {
+      recordAccess(req, { userId: user?.id || null, email: normalizedEmail, type: 'login_failed', reason });
+      return res.status(401).json({ error: 'Email ou senha incorretos.' });
+    };
 
-    if (!user || !user.passwordHash) return invalid();
+    if (!user || !user.passwordHash) return invalid('email_inexistente');
 
     const ok = await user.checkPassword(password);
-    if (!ok) return invalid();
+    if (!ok) return invalid('senha_incorreta');
 
     if (!user.isActive) {
+      recordAccess(req, { userId: user.id, email: normalizedEmail, type: 'login_failed', reason: 'conta_desativada' });
       return res.status(403).json({ error: 'Esta conta esta desativada. Fale com o suporte.' });
     }
 
     const token = generateAuthToken(user);
+    recordAccess(req, { userId: user.id, email: normalizedEmail, type: 'login_success' });
     return res.json({ user: user.toJSON(), token });
   } catch (err) {
     next(err);

@@ -4,6 +4,7 @@ const { getPlan, isCustomPlan, formatBRL } = require('../config/plans');
 const { sendMail } = require('../config/mailer');
 const templates = require('../utils/emailTemplates');
 const asaas = require('../config/asaas');
+const { generateCommissionForPayment } = require('../services/affiliateService');
 
 /**
  * Pagamentos via Asaas (Pix, boleto e cartão).
@@ -488,6 +489,9 @@ async function activatePaidEvent(event, payment, billingType) {
   event.pricePaidCents = payment.amountCents;
   if (event.status === EVENT_STATUS.DRAFT) event.status = EVENT_STATUS.ACTIVE;
   await event.save();
+
+  // Comissao de afiliado (20%) se o comprador foi indicado. Nunca lanca.
+  await generateCommissionForPayment(event, payment);
 
   // Email de confirmação
   try {

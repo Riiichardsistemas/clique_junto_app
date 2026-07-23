@@ -10,6 +10,7 @@ const Login = lazy(() => import('./pages/Login.jsx'));
 const Register = lazy(() => import('./pages/Register.jsx'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword.jsx'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword.jsx'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy.jsx'));
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const AccountSettings = lazy(() => import('./pages/AccountSettings.jsx'));
 const NewEvent = lazy(() => import('./pages/events/NewEvent.jsx'));
@@ -22,13 +23,16 @@ const Camera = lazy(() => import('./pages/guest/Camera.jsx'));
 const Album = lazy(() => import('./pages/guest/Album.jsx'));
 const Telao = lazy(() => import('./pages/telao/Telao.jsx'));
 const MyAlbums = lazy(() => import('./pages/guest/MyAlbums.jsx'));
+const Affiliate = lazy(() => import('./pages/Affiliate.jsx'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard.jsx'));
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers.jsx'));
 const AdminEvents = lazy(() => import('./pages/admin/AdminEvents.jsx'));
 const AdminPayments = lazy(() => import('./pages/admin/AdminPayments.jsx'));
 const AdminAudit = lazy(() => import('./pages/admin/AdminAudit.jsx'));
+const AdminAccessLogs = lazy(() => import('./pages/admin/AdminAccessLogs.jsx'));
 const AdminSystem = lazy(() => import('./pages/admin/AdminSystem.jsx'));
 const AdminAccount = lazy(() => import('./pages/admin/AdminAccount.jsx'));
+const AdminAffiliates = lazy(() => import('./pages/admin/AdminAffiliates.jsx'));
 
 function RoleHome() {
   const { user, loading } = useAuth();
@@ -80,6 +84,7 @@ export default function App() {
         <Route path="/register"         element={<Register />} />
         <Route path="/forgot-password"  element={<ForgotPassword />} />
         <Route path="/reset-password"   element={<ResetPassword />} />
+        <Route path="/privacidade"      element={<PrivacyPolicy />} />
         <Route path="/dashboard"        element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/account"          element={<ProtectedRoute><AccountSettings /></ProtectedRoute>} />
         <Route path="/events/new"       element={<ProtectedRoute><NewEvent /></ProtectedRoute>} />
@@ -92,13 +97,16 @@ export default function App() {
         <Route path="/e/:slug/album"    element={<Album />} />
         <Route path="/telao/:key"       element={<Telao />} />
         <Route path="/albuns"           element={<ProtectedRoute><MyAlbums /></ProtectedRoute>} />
+        <Route path="/afiliados"        element={<ProtectedRoute><Affiliate /></ProtectedRoute>} />
 
         {/* Painel super-admin */}
         <Route path="/admin"          element={<AdminRoute><AdminDashboard /></AdminRoute>} />
         <Route path="/admin/vendas"   element={<AdminRoute><AdminPayments /></AdminRoute>} />
+        <Route path="/admin/afiliados" element={<AdminRoute><AdminAffiliates /></AdminRoute>} />
         <Route path="/admin/usuarios" element={<AdminRoute><AdminUsers /></AdminRoute>} />
         <Route path="/admin/eventos"  element={<AdminRoute><AdminEvents /></AdminRoute>} />
         <Route path="/admin/auditoria" element={<AdminRoute><AdminAudit /></AdminRoute>} />
+        <Route path="/admin/logs"      element={<AdminRoute><AdminAccessLogs /></AdminRoute>} />
         <Route path="/admin/sistema"   element={<AdminRoute><AdminSystem /></AdminRoute>} />
         <Route path="/admin/conta"     element={<AdminRoute><AdminAccount /></AdminRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />

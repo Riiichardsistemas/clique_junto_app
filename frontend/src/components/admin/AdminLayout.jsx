@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   Activity, CalendarDays, CreditCard, LayoutDashboard, LogOut,
-  MoreHorizontal, ScrollText, Settings, ShieldCheck, Users, X,
+  MoreHorizontal, ScrollText, Settings, ShieldAlert, ShieldCheck, Users, X, Gift,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import Brand from '../ui/Brand.jsx';
@@ -13,6 +13,7 @@ const GROUPS = [
     items: [
       { to: '/admin', label: 'Visão geral', icon: LayoutDashboard, end: true },
       { to: '/admin/vendas', label: 'Vendas', icon: CreditCard },
+      { to: '/admin/afiliados', label: 'Afiliados', icon: Gift },
     ],
   },
   {
@@ -26,6 +27,7 @@ const GROUPS = [
     label: 'Governança',
     items: [
       { to: '/admin/auditoria', label: 'Auditoria', icon: ScrollText },
+      { to: '/admin/logs', label: 'Logs & Segurança', icon: ShieldAlert },
       { to: '/admin/sistema', label: 'Sistema', icon: Activity },
     ],
   },
@@ -104,7 +106,7 @@ export default function AdminLayout({ title, description, actions, children }) {
     </div>
   );
 
-  const moreActive = ['/admin/auditoria', '/admin/sistema', '/admin/conta'].some((path) => location.pathname.startsWith(path));
+  const moreActive = ['/admin/afiliados', '/admin/auditoria', '/admin/logs', '/admin/sistema', '/admin/conta'].some((path) => location.pathname.startsWith(path));
 
   return (
     <div className="app-screen pb-[calc(4.55rem+env(safe-area-inset-bottom))] text-cream lg:pb-0">
